@@ -1,6 +1,8 @@
+-- | https://sqlite.org/syntax.html
 module Lib where
 
 import Control.Monad
+import Data.Char
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import qualified Data.List.NonEmpty as List1
@@ -22,41 +24,76 @@ type Parser a =
 data S2 a b
   = S2'1 a
   | S2'2 b
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data SepBy1 a b
   = SepBy1'Cons a b (SepBy1 a b)
   | SepBy1'End a
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 --
 
 -- TODO
+data AggregateFunction
+
+-- | @
+-- DISTINCT? expression (, expression)*
+-- @
+--
+-- FIXME distinct only makes sense for a single argument
+data AggregateFunctionArguments = AggregateFunctionArguments
+  { distinct :: Bool,
+    arguments :: List1 Expression
+  }
+
+aggregateFunctionArgumentsParser :: Parser AggregateFunctionArguments
+aggregateFunctionArgumentsParser = do
+  distinct <- True <$ keyword "DISTINCT" <|> pure False
+  arguments <- commaSep1 expressionParser
+  pure AggregateFunctionArguments {distinct, arguments}
+
+-- | https://www.sqlite.org/syntax/aggregate-function-invocation.html
+data AggregateFunctionInvocation = AggregateFunctionInvocation
+  { aggregateFunction :: Identifier,
+    -- | @Nothing@ = @()@
+    -- @Just Nothing@ = @(*)@
+    arguments :: Maybe (Maybe AggregateFunctionArguments),
+    filterClause :: Maybe FilterClause
+  }
+
+aggregateFunctionInvocationParser :: Parser AggregateFunctionInvocation
+aggregateFunctionInvocationParser = do
+  aggregateFunction <- identifierParser
+  arguments <- parens (optional (Nothing <$ (char '*' *> space) <|> Just <$> aggregateFunctionArgumentsParser))
+  filterClause <- optional filterClauseParser
+  pure AggregateFunctionInvocation {aggregateFunction, arguments, filterClause}
+
+-- TODO
 data BlobLiteral
   = BlobLiteral
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data CollationName
   = CollationName
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data ColumnAlias
   = ColumnAlias
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data ColumnName
   = ColumnName
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data CommonTableExpression = CommonTableExpression
   { tableName :: TableName,
     columnNames :: [ColumnName],
     select :: SelectStatement
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 commonTableExpressionParser :: Parser CommonTableExpression
 commonTableExpressionParser = undefined
@@ -66,7 +103,7 @@ data CompoundOperator
   | CompoundOperator'Intersect
   | CompoundOperator'Union
   | CompoundOperator'UnionAll
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data Expression
   = Expression'Literal LiteralValue
@@ -76,19 +113,38 @@ data Expression
     -- | Expression'BinaryOperator Expression BinaryOperator Expression
     Expression'Function -- TODO
     -- TODO
-  deriving stock (Show)
+  deriving stock (Eq, Show)
+
+expressionParser :: Parser Expression
+expressionParser =
+  undefined
+
+-- TODO
+data FilterClause
+
+filterClauseParser :: Parser FilterClause
+filterClauseParser = undefined
 
 data GroupBy = GroupBy
   { expressions :: List1 Expression,
     having :: Maybe Expression
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
+
+newtype Identifier = Identifier {unIdentifier :: Text}
+  deriving stock (Eq, Show)
+
+-- | FIXME find the docs on what makes a valid identifier
+identifierParser :: Parser Identifier
+identifierParser = do
+  ident <- takeWhile1P Nothing isAlpha
+  pure (Identifier ident)
 
 data Limit = Limit
   { expression :: Expression,
     offset :: Maybe Expression
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data LiteralValue
   = LiteralValue'BlobLiteral BlobLiteral
@@ -100,22 +156,22 @@ data LiteralValue
   | LiteralValue'NumericLiteral NumericLiteral
   | LiteralValue'StringLiteral StringLiteral
   | LiteralValue'True
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data NumericLiteral
   = NumericLiteral
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data Ordering
   = Ordering'Ascending
   | Ordering'Descrnding
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data OrderingNulls
   = OrderingNulls'First
   | OrderingNulls'Last
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data OrderingTerm = OrderingTerm
   { expression :: Expression,
@@ -123,12 +179,12 @@ data OrderingTerm = OrderingTerm
     ordering :: Maybe Ordering,
     nulls :: Maybe OrderingNulls
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data ResultColumn
   = ResultColumn'Expression Expression (Maybe ColumnAlias)
   | ResultColumn'Star (Maybe TableName)
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data SelectStatement = SelectStatement
   { with :: Maybe With,
@@ -136,7 +192,7 @@ data SelectStatement = SelectStatement
     orderBy :: [OrderingTerm],
     limit :: Maybe Limit
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data SelectCore = SelectCore
   { distinct :: Bool,
@@ -146,46 +202,52 @@ data SelectCore = SelectCore
     groupBy :: Maybe GroupBy,
     window :: [Window]
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data StringLiteral
   = StringLiteral
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
--- TODO
 data TableName
-  = TableName
-  deriving stock (Show)
+  = TableName (Maybe Identifier) Identifier
+  deriving stock (Eq, Show)
+
+tableNameParser :: Parser TableName
+tableNameParser = do
+  schema <- optional identifierParser
+  _ <- char '.'
+  table <- identifierParser
+  pure (TableName schema table)
 
 -- TODO
 data TableOrSubquery
   = TableOrSubquery
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 newtype Values
   = Values (List1 (List1 Expression))
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data Window
   = Window WindowName WindowDefinition
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data WindowDefinition
   = WindowDefinition
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 -- TODO
 data WindowName
   = WindowName
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data With = With
   { recursive :: Bool,
     commonTableExpressions :: List1 CommonTableExpression
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 withParser :: Parser With
 withParser = do
@@ -207,6 +269,10 @@ debugParse parser input =
 commaSep1 :: Parser a -> Parser (List1 a)
 commaSep1 parser =
   List1.fromList <$> sepBy1 parser (char ',' <* space)
+
+parens :: Parser a -> Parser a
+parens =
+  between (char '(' *> space) (char ')' *> space)
 
 keyword :: Text -> Parser ()
 keyword word = do
