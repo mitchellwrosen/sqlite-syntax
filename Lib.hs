@@ -3,6 +3,7 @@ module Lib where
 
 import Control.Monad
 import Data.Char
+import Data.Coerce
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import qualified Data.List.NonEmpty as List1
@@ -68,6 +69,22 @@ aggregateFunctionInvocationParser = do
   filterClause <- optional filterClauseParser
   pure AggregateFunctionInvocation {aggregateFunction, arguments, filterClause}
 
+data AlterTableStatement = AlterTableStatement
+  { schemaName :: Maybe SchemaName,
+    tableName :: TableName,
+    tableAlteration :: TableAlteration
+  }
+  deriving stock (Eq, Show)
+
+alterTableStatementParser :: Parser AlterTableStatement
+alterTableStatementParser = do
+  keyword "ALTER"
+  keyword "TABLE"
+  schemaName <- optional (schemaNameParser <* char '.')
+  tableName <- tableNameParser
+  tableAlteration <- tableAlterationParser
+  pure AlterTableStatement {schemaName, tableName, tableAlteration}
+
 -- TODO
 data BlobLiteral
   = BlobLiteral
@@ -81,6 +98,11 @@ data CollationName
 -- TODO
 data ColumnAlias
   = ColumnAlias
+  deriving stock (Eq, Show)
+
+-- TODO
+data ColumnDefinition
+  = ColumnDefinition
   deriving stock (Eq, Show)
 
 -- TODO
@@ -186,6 +208,13 @@ data ResultColumn
   | ResultColumn'Star (Maybe TableName)
   deriving stock (Eq, Show)
 
+newtype SchemaName = SchemaName {unSchemaName :: Identifier}
+  deriving stock (Eq, Show)
+
+schemaNameParser :: Parser SchemaName
+schemaNameParser =
+  coerce identifierParser
+
 data SelectStatement = SelectStatement
   { with :: Maybe With,
     selects :: SepBy1 (S2 SelectCore Values) CompoundOperator,
@@ -209,16 +238,39 @@ data StringLiteral
   = StringLiteral
   deriving stock (Eq, Show)
 
-data TableName
-  = TableName (Maybe Identifier) Identifier
+data TableAlteration
+  = TableAlteration'AddColumn ColumnDefinition
+  | TableAlteration'DropColumn ColumnName
+  | TableAlteration'RenameColumn ColumnName ColumnName
+  | TableAlteration'RenameTable TableName
+  deriving stock (Eq, Show)
+
+tableAlterationParser :: Parser TableAlteration
+tableAlterationParser =
+  addColumnParser <|> dropColumnParser <|> renameColumnParser <|> renameTableParser
+  where
+    addColumnParser :: Parser TableAlteration
+    addColumnParser =
+      undefined
+
+    dropColumnParser :: Parser TableAlteration
+    dropColumnParser =
+      undefined
+
+    renameColumnParser :: Parser TableAlteration
+    renameColumnParser =
+      undefined
+
+    renameTableParser :: Parser TableAlteration
+    renameTableParser =
+      undefined
+
+newtype TableName = TableName {unTableName :: Identifier}
   deriving stock (Eq, Show)
 
 tableNameParser :: Parser TableName
-tableNameParser = do
-  schema <- optional identifierParser
-  _ <- char '.'
-  table <- identifierParser
-  pure (TableName schema table)
+tableNameParser =
+  coerce identifierParser
 
 -- TODO
 data TableOrSubquery
