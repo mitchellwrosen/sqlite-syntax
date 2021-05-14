@@ -15,8 +15,7 @@ main = do
     let input0 = Text.unwords (map renderToken tokens0)
     case lex input0 of
       Left err -> fail (Text.unpack err)
-      Right tokens1 -> do
-        tokens0 === tokens1
+      Right tokens1 -> tokens0 === tokens1
 
 genToken :: Gen Token
 genToken =
@@ -195,11 +194,11 @@ genToken =
       pure WINDOW,
       pure WITH,
       pure WITHOUT,
-      Integer <$> Gen.int64 (Range.constant minBound maxBound)
-      -- Identifier <$> undefined,
-      -- Blob <$> undefined,
+      Integer <$> Gen.int64 (Range.constant minBound maxBound),
       -- Float <$> undefined,
-      -- String <$> undefined,
+      String <$> Gen.text (Range.linear 0 10) Gen.unicode
+      -- Blob <$> undefined,
+      -- Identifier <$> undefined,
     ]
 
 renderToken :: Token -> Text
@@ -356,7 +355,7 @@ renderToken = \case
   SET -> "SET"
   Semicolon -> ";"
   Solidus -> "/"
-  String _ -> "TODO"
+  String s -> "'" <> Text.replace "'" "''" s <> "'"
   TABLE -> "TABLE"
   TEMP -> "TEMP"
   TEMPORARY -> "TEMPORARY"
