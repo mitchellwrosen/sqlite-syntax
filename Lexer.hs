@@ -5,13 +5,10 @@ module Lexer
 where
 
 import Control.Applicative ((<|>))
-import Control.Monad.Combinators (many)
+import Control.Monad.Combinators (choice, many)
 import Data.ByteString (ByteString)
 import Data.Char
-import Data.Foldable (asum)
 import Data.Functor
-import Data.Int (Int64)
-import Data.List (foldl')
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Void (Void)
@@ -19,7 +16,7 @@ import GHC.Generics (Generic)
 import qualified Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Char as Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as Megaparsec.Lexer
-import Prelude hiding (Bool (..), lex)
+import Prelude hiding (Bool (..), exponent, lex)
 
 type Lexer =
   Megaparsec.Parsec Void Text
@@ -93,7 +90,6 @@ data Token
   | FOREIGN -- ^ @FOREIGN@
   | FROM -- ^ @FROM@
   | FULL -- ^ @FULL@
-  | Float Double
   | FullStop -- ^ @.@
   | GENERATED -- ^ @GENERATED@
   | GLOB -- ^ @GLOB@
@@ -119,7 +115,6 @@ data Token
   | IS -- ^ @IS@
   | ISNULL -- ^ @ISNULL@
   | Identifier Text
-  | Integer Int64
   | JOIN -- ^ @JOIN@
   | KEY -- ^ @KEY@
   | LAST -- ^ @LAST@
@@ -140,6 +135,7 @@ data Token
   | NOTNULL -- ^ @NOTNULL@
   | NULL -- ^ @NULL@
   | NULLS -- ^ @NULLS@
+  | Number Text -- ^ Numeric literal
   | OF -- ^ @OF@
   | OFFSET -- ^ @OFFSET@
   | ON -- ^ @ON@
@@ -242,19 +238,19 @@ lex input =
 
 token :: Lexer Token
 token =
-  asum
+  choice
     [ Ampersand <$ symbol "&",
       Asterisk <$ symbol "*",
       Comma <$ symbol ",",
       EqualsSignEqualsSign <$ symbol "==",
       EqualsSign <$ symbol "=",
       ExclamationMarkEqualsSign <$ symbol "!=",
+      -- "try" because we might consume a '.' character, then fail to parse a number
+      Megaparsec.try (Number <$> number),
       FullStop <$ symbol ".",
       GreaterThanSignEqualsSign <$ symbol ">=",
       GreaterThanSignGreaterThanSign <$ symbol ">>",
       GreaterThanSign <$ symbol ">",
-      -- "try" because we might consume a '-' character, then fail to parse an integer
-      Megaparsec.try (Integer <$> integer),
       HyphenMinus <$ symbol "-",
       LeftParen <$ symbol "(",
       LessThanSignEqualsSign <$ symbol "<=",
@@ -421,7 +417,6 @@ token =
       WITHOUT <$ keyword "without",
       WITH <$ keyword "with",
       -- Blob <$> undefined,
-      -- Float <$> undefined,
       String <$> string
       -- TODO parameters
     ]
@@ -455,13 +450,6 @@ token =
           xs <- Megaparsec.takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
           pure (Text.cons x xs)
 
-    integer :: Lexer Int64
-    integer =
-      lexeme do
-        f <- negate <$ Megaparsec.char '-' <|> pure id
-        digits <- Megaparsec.takeWhile1P Nothing isDigit
-        pure (f (foldl' (\n x -> n * 10 + fromIntegral (digitToInt x)) 0 (Text.unpack digits)))
-
     -- A string constant is formed by enclosing the string in single quotes ('). A single quote within the string can be
     -- encoded by putting two single quotes in a row - as in Pascal. C-style escapes using the backslash character are
     -- not supported because they are not standard SQL.
@@ -480,3 +468,39 @@ token =
         singleQuote :: Lexer Text
         singleQuote =
           "'" <$ Megaparsec.string "''"
+
+number :: Lexer Text
+number =
+  lexeme do
+    choice
+      [ Megaparsec.try do
+          s0 <- Megaparsec.string' "0x"
+          s1 <- Megaparsec.takeWhile1P Nothing isHexDigit
+          pure (s0 <> s1),
+        do
+          s0 <- Megaparsec.takeWhileP Nothing isDigit
+          s1 <- if Text.null s0 then fractional else (fractional <|> pure "")
+          s2 <- exponent <|> pure ""
+          pure (s0 <> s1 <> s2)
+      ]
+  where
+    digits :: Lexer Text
+    digits =
+      Megaparsec.takeWhile1P Nothing isDigit
+
+    exponent :: Lexer Text
+    exponent = do
+      s0 <- Megaparsec.satisfy \c -> c == 'e' || c == 'E'
+      s1 <- sign <|> pure ""
+      s2 <- digits
+      pure (Text.cons s0 (s1 <> s2))
+      where
+        sign :: Lexer Text
+        sign =
+          Text.singleton <$> Megaparsec.satisfy \c -> c == '+' || c == '-'
+
+    fractional :: Lexer Text
+    fractional = do
+      s0 <- Megaparsec.char '.'
+      s1 <- digits
+      pure (Text.cons s0 s1)

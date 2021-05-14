@@ -1,5 +1,6 @@
 module Main where
 
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Hedgehog
@@ -194,12 +195,39 @@ genToken =
       pure WINDOW,
       pure WITH,
       pure WITHOUT,
-      Integer <$> Gen.int64 (Range.constant minBound maxBound),
-      -- Float <$> undefined,
+      Number <$> genNumber,
       String <$> Gen.text (Range.linear 0 10) Gen.unicode
       -- Blob <$> undefined,
       -- Identifier <$> undefined,
     ]
+  where
+    genNumber :: Gen Text
+    genNumber =
+      Gen.choice
+        [ (\s0 s1 s2 -> s0 <> fromMaybe "" s1 <> s2)
+            <$> genDigits <*> Gen.maybe genFractional <*> genExponent,
+          (\s0 s1 -> s0 <> s1) <$> genFractional <*> genExponent,
+          (\s0 s1 -> s0 <> Text.pack s1)
+            <$> Gen.element ["0x", "0X"]
+            <*> Gen.list (Range.linear 1 10) (Gen.element (['0' .. '9'] ++ ['A' .. 'F'] ++ ['a' .. 'f']))
+        ]
+      where
+        genDigits :: Gen Text
+        genDigits =
+          Text.pack <$> Gen.list (Range.linear 1 10) Gen.digit
+
+        genExponent :: Gen Text
+        genExponent =
+          (fmap (fromMaybe "") . Gen.maybe)
+            ( (\s0 s1 s2 -> Text.singleton s0 <> maybe Text.empty Text.singleton s1 <> s2)
+                <$> Gen.element ['e', 'E'] <*> Gen.maybe (Gen.element ['+', '-']) <*> genDigits
+            )
+
+        genFractional :: Gen Text
+        genFractional =
+          Text.cons '.' <$> genDigits
+
+-- Gen.int64 (Range.constant minBound maxBound),
 
 renderToken :: Token -> Text
 renderToken = \case
@@ -270,7 +298,6 @@ renderToken = \case
   FOREIGN -> "FOREIGN"
   FROM -> "FROM"
   FULL -> "FULL"
-  Float n -> Text.pack (show n)
   FullStop -> "."
   GENERATED -> "GENERATED"
   GLOB -> "GLOB"
@@ -296,7 +323,6 @@ renderToken = \case
   IS -> "IS"
   ISNULL -> "ISNULL"
   Identifier _ -> "TODO"
-  Integer n -> Text.pack (show n)
   JOIN -> "JOIN"
   KEY -> "KEY"
   LAST -> "LAST"
@@ -317,6 +343,7 @@ renderToken = \case
   NOTNULL -> "NOTNULL"
   NULL -> "NULL"
   NULLS -> "NULLS"
+  Number s -> s
   OF -> "OF"
   OFFSET -> "OFFSET"
   ON -> "ON"
