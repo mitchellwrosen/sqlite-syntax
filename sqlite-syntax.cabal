@@ -43,3 +43,4 @@ library
     text,
     unordered-containers,
   exposed-modules: Lib
+  other-modules: Lexer
