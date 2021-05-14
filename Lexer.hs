@@ -1,18 +1,23 @@
 module Lexer
   ( Token (..),
+    lex,
   )
 where
 
+import Control.Applicative ((<|>))
+import Control.Monad.Combinators (many)
 import Data.ByteString (ByteString)
+import Data.Char
 import Data.Foldable (asum)
 import Data.Functor
 import Data.Int (Int64)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Void (Void)
 import qualified Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Char as Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as Megaparsec.Lexer
-import Prelude hiding (Bool (..))
+import Prelude hiding (Bool (..), lex)
 
 type Lexer =
   Megaparsec.Parsec Void Text
@@ -178,6 +183,10 @@ keyword :: Text -> Lexer Text
 keyword =
   Megaparsec.Lexer.symbol' space
 
+lexeme :: Lexer a -> Lexer a
+lexeme =
+  Megaparsec.Lexer.lexeme space
+
 space :: Lexer ()
 space =
   Megaparsec.Lexer.space
@@ -189,19 +198,23 @@ symbol :: Text -> Lexer Text
 symbol =
   Megaparsec.Lexer.symbol space
 
--- "keyword"
--- [keyword]
--- `keyword`
--- non_keyword
-lexIdentifier :: Lexer Text
-lexIdentifier =
-  undefined
+lex :: Text -> Either Text [Token]
+lex input =
+  case Megaparsec.parse lexer "" input of
+    Left err -> Left (Text.pack (Megaparsec.errorBundlePretty err))
+    Right tokens -> Right tokens
+  where
+    lexer :: Lexer [Token]
+    lexer = do
+      space
+      tokens <- many token
+      Megaparsec.eof
+      pure tokens
 
-lexToken :: Lexer Token
-lexToken =
+token :: Lexer Token
+token =
   asum
-    [ -- Symbols
-      Ampersand <$ symbol "&",
+    [ Ampersand <$ symbol "&",
       Asterisk <$ symbol "*",
       Comma <$ symbol ",",
       EqualsSign <$ symbol "=",
@@ -225,7 +238,6 @@ lexToken =
       Tilde <$ symbol "~",
       VerticalLine <$ symbol "|",
       VerticalLineVerticalLine <$ symbol "||",
-      -- Keywords
       ABORT <$ keyword "abort",
       ADD <$ keyword "add",
       AFTER <$ keyword "after",
@@ -351,10 +363,56 @@ lexToken =
       WINDOW <$ keyword "window",
       WITH <$ keyword "with",
       WITHOUT <$ keyword "without",
-      -- This has to come after all keywords
-      Identifier <$> lexIdentifier
-      -- TODO numeric-literal
-      -- TODO string-literal
-      -- TODO blob-literal
+      Identifier <$> identifier,
+      -- Blob <$> undefined,
+      -- Integer <$> undefined,
+      -- Float <$> undefined,
+      String <$> string
       -- TODO parameters
     ]
+  where
+    -- It appears any string is a valid identifier, even the empty string, except strings that begin with "sqlite_".
+    -- There are three different ways of quoting identifiers ("this", [this], and `this`), and within a quoted
+    -- identifier, I don't believe there is any escape syntax. (It seems impossible, therefore, to define an identifer
+    -- that happens to have a ", ], and ` character...). Still looking for official documentation on all of this. This is
+    -- all I've found:
+    --
+    --   https://stackoverflow.com/questions/3694276/what-are-valid-table-names-in-sqlite
+    identifier :: Lexer Text
+    identifier = do
+      lexeme do
+        s <- unquoted <|> quoted '"' '"' <|> quoted '[' ']' <|> quoted '`' '`'
+        if "sqlite_" `Text.isPrefixOf` s
+          then fail "reserved identifier"
+          else pure s
+      where
+        quoted :: Char -> Char -> Lexer Text
+        quoted c0 c1 = do
+          _ <- Megaparsec.char c0
+          s <- Megaparsec.takeWhileP Nothing \c -> '\x20' <= c && c <= '\x10FFFF' && c /= c1
+          _ <- Megaparsec.char c1
+          pure s
+
+        -- This is just a guess for now. Still looking for official documentation.
+        unquoted :: Lexer Text
+        unquoted = do
+          x <- Megaparsec.lowerChar
+          xs <- Megaparsec.takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
+          pure (Text.cons x xs)
+
+    -- A string constant is formed by enclosing the string in single quotes ('). A single quote within the string can be
+    -- encoded by putting two single quotes in a row - as in Pascal. C-style escapes using the backslash character are
+    -- not supported because they are not standard SQL.
+    string :: Lexer Text
+    string =
+      lexeme do
+        chunks <- many (chunk <|> singleQuote)
+        pure (Text.concat chunks)
+      where
+        chunk :: Lexer Text
+        chunk =
+          Megaparsec.takeWhile1P Nothing \c -> '\x20' <= c && c <= '\x10FFFF' && c /= '\''
+
+        singleQuote :: Lexer Text
+        singleQuote =
+          "'" <$ Megaparsec.string "''"
