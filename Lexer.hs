@@ -14,6 +14,7 @@ import Data.Int (Int64)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Void (Void)
+import GHC.Generics (Generic)
 import qualified Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Char as Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as Megaparsec.Lexer
@@ -25,29 +26,36 @@ type Lexer =
 {- ORMOLU_DISABLE -}
 data Token
   = ABORT -- ^ @ABORT@
+  | ACTION -- ^ @ACTION@
   | ADD -- ^ @ADD@
   | AFTER -- ^ @AFTER@
   | ALL -- ^ @ALL@
   | ALTER -- ^ @ALTER@
+  | ALWAYS -- ^ @ALWAYS@
   | ANALYZE -- ^ @ANALYZE@
   | AND -- ^ @AND@
   | AS -- ^ @AS@
   | ASC -- ^ @ASC@
   | ATTACH -- ^ @ATTACH@
+  | AUTOINCREMENT -- ^ @AUTOINCREMENT@
   | Ampersand -- ^ @&@
   | Asterisk -- ^ @*@
   | BEFORE -- ^ @BEFORE@
   | BEGIN -- ^ @BEGIN@
   | BETWEEN -- ^ @BETWEEN@
-  | Blob ByteString
   | BY -- ^ @BY@
+  | Blob ByteString
+  | CASCADE -- ^ @CASCADE@
   | CASE -- ^ @CASE@
   | CAST -- ^ @CAST@
+  | CHECK -- ^ @CHECK@
   | COLLATE -- ^ @COLLATE@
   | COLUMN -- ^ @COLUMN@
   | COMMIT -- ^ @COMMIT@
   | CONFLICT -- ^ @CONFLICT@
+  | CONSTRAINT -- ^ @CONSTRAINT@
   | CREATE -- ^ @CREATE@
+  | CROSS -- ^ @CROSS@
   | CURRENT -- ^ @CURRENT@
   | CURRENT_DATE -- ^ @CURRENT_DATE@
   | CURRENT_TIME -- ^ @CURRENT_TIME@
@@ -55,6 +63,7 @@ data Token
   | Comma -- ^ @,@
   | DATABASE -- ^ @DATABASE@
   | DEFAULT -- ^ @DEFAULT@
+  | DEFERRABLE -- ^ @DEFERRABLE@
   | DEFERRED -- ^ @DEFERRED@
   | DELETE -- ^ @DELETE@
   | DESC -- ^ @DESC@
@@ -66,6 +75,7 @@ data Token
   | ELSE -- ^ @ELSE@
   | END -- ^ @END@
   | ESCAPE -- ^ @ESCAPE@
+  | EXCEPT -- ^ @EXCEPT@
   | EXCLUDE -- ^ @EXCLUDE@
   | EXCLUSIVE -- ^ @EXCLUSIVE@
   | EXISTS -- ^ @EXISTS@
@@ -75,12 +85,16 @@ data Token
   | ExclamationMarkEqualsSign -- ^ @!=@
   | FAIL -- ^ @FAIL@
   | FALSE -- ^ @FALSE@
+  | FILTER -- ^ @FILTER@
   | FIRST -- ^ @FIRST@
   | FOLLOWING -- ^ @FOLLOWING@
   | FOR -- ^ @FOR@
+  | FOREIGN -- ^ @FOREIGN@
   | FROM -- ^ @FROM@
+  | FULL -- ^ @FULL@
   | Float Double
   | FullStop -- ^ @.@
+  | GENERATED -- ^ @GENERATED@
   | GLOB -- ^ @GLOB@
   | GROUP -- ^ @GROUP@
   | GROUPS -- ^ @GROUPS@
@@ -95,14 +109,20 @@ data Token
   | IN -- ^ @IN@
   | INDEX -- ^ @INDEX@
   | INDEXED -- ^ @INDEXED@
+  | INITIALLY -- ^ @INITIALLY@
+  | INNER -- ^ @INNER@
   | INSERT -- ^ @INSERT@
   | INSTEAD -- ^ @INSTEAD@
+  | INTERSECT -- ^ @INTERSECT@
   | INTO -- ^ @INTO@
   | IS -- ^ @IS@
   | ISNULL -- ^ @ISNULL@
   | Identifier Text
   | Integer Int64
+  | JOIN -- ^ @JOIN@
+  | KEY -- ^ @KEY@
   | LAST -- ^ @LAST@
+  | LEFT -- ^ @LEFT@
   | LIKE -- ^ @LIKE@
   | LIMIT -- ^ @LIMIT@
   | LeftParen -- ^ @(@
@@ -112,6 +132,7 @@ data Token
   | LessThanSignLessThanSign -- ^ @<<@
   | MATCH -- ^ @MATCH@
   | MATERIALIZED -- ^ @MATERIALIZED@
+  | NATURAL -- ^ @NATURAL@
   | NO -- ^ @NO@
   | NOT -- ^ @NOT@
   | NOTHING -- ^ @NOTHING@
@@ -124,23 +145,28 @@ data Token
   | OR -- ^ @OR@
   | ORDER -- ^ @ORDER@
   | OTHERS -- ^ @OTHERS@
+  | OUTER -- ^ @OUTER@
   | OVER -- ^ @OVER@
   | PARTITION -- ^ @PARTITION@
   | PLAN -- ^ @PLAN@
   | PRAGMA -- ^ @PRAGMA@
   | PRECEDING -- ^ @PRECEDING@
+  | PRIMARY -- ^ @PRIMARY@
   | PercentSign -- ^ @%@
   | PlusSign -- ^ @+@
   | QUERY -- ^ @QUERY@
   | RAISE -- ^ @RAISE@
   | RANGE -- ^ @RANGE@
   | RECURSIVE -- ^ @RECURSIVE@
+  | REFERENCES -- ^ @REFERENCES@
   | REGEXP -- ^ @REGEXP@
   | REINDEX -- ^ @REINDEX@
   | RELEASE -- ^ @RELEASE@
   | RENAME -- ^ @RENAME@
   | REPLACE -- ^ @REPLACE@
+  | RESTRICT -- ^ @RESTRICT@
   | RETURNING -- ^ @RETURNING@
+  | RIGHT -- ^ @RIGHT@
   | ROLLBACK -- ^ @ROLLBACK@
   | ROW -- ^ @ROW@
   | ROWID -- ^ @ROWID@
@@ -163,6 +189,7 @@ data Token
   | TRUE -- ^ @TRUE@
   | Tilde -- ^ @~@
   | UNBOUNDED -- ^ @UNBOUNDED@
+  | UNION -- ^ @UNION@
   | UNIQUE -- ^ @UNIQUE@
   | UPDATE -- ^ @UPDATE@
   | USING -- ^ @USING@
@@ -177,6 +204,7 @@ data Token
   | WINDOW -- ^ @WINDOW@
   | WITH -- ^ @WITH@
   | WITHOUT -- ^ @WITHOUT@
+  deriving stock (Eq, Generic, Show)
 {- ORMOLU_ENABLE -}
 
 keyword :: Text -> Lexer Text
@@ -217,54 +245,63 @@ token =
     [ Ampersand <$ symbol "&",
       Asterisk <$ symbol "*",
       Comma <$ symbol ",",
-      EqualsSign <$ symbol "=",
       EqualsSignEqualsSign <$ symbol "==",
+      EqualsSign <$ symbol "=",
       ExclamationMarkEqualsSign <$ symbol "!=",
       FullStop <$ symbol ".",
-      GreaterThanSign <$ symbol ">",
       GreaterThanSignEqualsSign <$ symbol ">=",
       GreaterThanSignGreaterThanSign <$ symbol ">>",
+      GreaterThanSign <$ symbol ">",
       HyphenMinus <$ symbol "-",
       LeftParen <$ symbol "(",
-      LessThanSign <$ symbol "<",
       LessThanSignEqualsSign <$ symbol "<=",
       LessThanSignGreaterThanSign <$ symbol "<>",
       LessThanSignLessThanSign <$ symbol "<<",
+      LessThanSign <$ symbol "<",
       PercentSign <$ symbol "%",
       PlusSign <$ symbol "+",
       RightParen <$ symbol ")",
       Semicolon <$ symbol ";",
       Solidus <$ symbol "/",
       Tilde <$ symbol "~",
-      VerticalLine <$ symbol "|",
       VerticalLineVerticalLine <$ symbol "||",
+      VerticalLine <$ symbol "|",
+      Identifier <$> identifier,
       ABORT <$ keyword "abort",
+      ACTION <$ keyword "action",
       ADD <$ keyword "add",
       AFTER <$ keyword "after",
       ALL <$ keyword "all",
       ALTER <$ keyword "alter",
+      ALWAYS <$ keyword "always",
       ANALYZE <$ keyword "analyze",
       AND <$ keyword "and",
-      AS <$ keyword "as",
       ASC <$ keyword "asc",
+      AS <$ keyword "as",
       ATTACH <$ keyword "attach",
+      AUTOINCREMENT <$ keyword "autoincrement",
       BEFORE <$ keyword "before",
       BEGIN <$ keyword "begin",
       BETWEEN <$ keyword "between",
       BY <$ keyword "by",
+      CASCADE <$ keyword "cascade",
       CASE <$ keyword "case",
       CAST <$ keyword "cast",
+      CHECK <$ keyword "check",
       COLLATE <$ keyword "collate",
       COLUMN <$ keyword "column",
       COMMIT <$ keyword "commit",
       CONFLICT <$ keyword "conflict",
+      CONSTRAINT <$ keyword "constraint",
       CREATE <$ keyword "create",
-      CURRENT <$ keyword "current",
+      CROSS <$ keyword "cross",
       CURRENT_DATE <$ keyword "current_date",
-      CURRENT_TIME <$ keyword "current_time",
       CURRENT_TIMESTAMP <$ keyword "current_timestamp",
+      CURRENT_TIME <$ keyword "current_time",
+      CURRENT <$ keyword "current",
       DATABASE <$ keyword "database",
       DEFAULT <$ keyword "default",
+      DEFERRABLE <$ keyword "deferrable",
       DEFERRED <$ keyword "deferred",
       DELETE <$ keyword "delete",
       DESC <$ keyword "desc",
@@ -276,73 +313,90 @@ token =
       ELSE <$ keyword "else",
       END <$ keyword "end",
       ESCAPE <$ keyword "escape",
+      EXCEPT <$ keyword "except",
       EXCLUDE <$ keyword "exclude",
       EXCLUSIVE <$ keyword "exclusive",
       EXISTS <$ keyword "exists",
       EXPLAIN <$ keyword "explain",
       FAIL <$ keyword "fail",
       FALSE <$ keyword "false",
+      FILTER <$ keyword "filter",
       FIRST <$ keyword "first",
       FOLLOWING <$ keyword "following",
+      FOREIGN <$ keyword "foreign",
       FOR <$ keyword "for",
       FROM <$ keyword "from",
+      FULL <$ keyword "full",
+      GENERATED <$ keyword "generated",
       GLOB <$ keyword "glob",
-      GROUP <$ keyword "group",
       GROUPS <$ keyword "groups",
+      GROUP <$ keyword "group",
       HAVING <$ keyword "having",
       IF <$ keyword "if",
       IGNORE <$ keyword "ignore",
       IMMEDIATE <$ keyword "immediate",
-      IN <$ keyword "in",
-      INDEX <$ keyword "index",
       INDEXED <$ keyword "indexed",
+      INDEX <$ keyword "index",
+      INITIALLY <$ keyword "initially",
+      INNER <$ keyword "inner",
       INSERT <$ keyword "insert",
       INSTEAD <$ keyword "instead",
+      INTERSECT <$ keyword "intersect",
       INTO <$ keyword "into",
-      IS <$ keyword "is",
+      IN <$ keyword "in",
       ISNULL <$ keyword "isnull",
+      IS <$ keyword "is",
+      JOIN <$ keyword "join",
+      KEY <$ keyword "key",
       LAST <$ keyword "last",
+      LEFT <$ keyword "left",
       LIKE <$ keyword "like",
       LIMIT <$ keyword "limit",
       MATCH <$ keyword "match",
       MATERIALIZED <$ keyword "materialized",
-      NO <$ keyword "no",
-      NOT <$ keyword "not",
+      NATURAL <$ keyword "natural",
       NOTHING <$ keyword "nothing",
       NOTNULL <$ keyword "notnull",
-      NULL <$ keyword "null",
+      NOT <$ keyword "not",
+      NO <$ keyword "no",
       NULLS <$ keyword "nulls",
-      OF <$ keyword "of",
+      NULL <$ keyword "null",
       OFFSET <$ keyword "offset",
+      OF <$ keyword "of",
       ON <$ keyword "on",
-      OR <$ keyword "or",
       ORDER <$ keyword "order",
+      OR <$ keyword "or",
       OTHERS <$ keyword "others",
+      OUTER <$ keyword "outer",
       OVER <$ keyword "over",
       PARTITION <$ keyword "partition",
       PLAN <$ keyword "plan",
       PRAGMA <$ keyword "pragma",
       PRECEDING <$ keyword "preceding",
+      PRIMARY <$ keyword "primary",
       QUERY <$ keyword "query",
       RAISE <$ keyword "raise",
       RANGE <$ keyword "range",
       RECURSIVE <$ keyword "recursive",
+      REFERENCES <$ keyword "references",
       REGEXP <$ keyword "regexp",
       REINDEX <$ keyword "reindex",
       RELEASE <$ keyword "release",
       RENAME <$ keyword "rename",
       REPLACE <$ keyword "replace",
+      RESTRICT <$ keyword "restrict",
       RETURNING <$ keyword "returning",
+      RIGHT <$ keyword "right",
       ROLLBACK <$ keyword "rollback",
-      ROW <$ keyword "row",
       ROWID <$ keyword "rowid",
       ROWS <$ keyword "rows",
+      ROW <$ keyword "row",
       SAVEPOINT <$ keyword "savepoint",
       SELECT <$ keyword "select",
       SET <$ keyword "set",
       TABLE <$ keyword "table",
-      TEMP <$ keyword "temp",
       TEMPORARY <$ keyword "temporary",
+      TEMP <$ keyword "temp",
       THEN <$ keyword "then",
       TIES <$ keyword "ties",
       TO <$ keyword "to",
@@ -350,8 +404,8 @@ token =
       TRIGGER <$ keyword "trigger",
       TRUE <$ keyword "true",
       UNBOUNDED <$ keyword "unbounded",
+      UNION <$ keyword "union",
       UNIQUE <$ keyword "unique",
-      UPDATE <$ keyword "update",
       UPDATE <$ keyword "update",
       USING <$ keyword "using",
       VACUUM <$ keyword "vacuum",
@@ -361,9 +415,8 @@ token =
       WHEN <$ keyword "when",
       WHERE <$ keyword "where",
       WINDOW <$ keyword "window",
-      WITH <$ keyword "with",
       WITHOUT <$ keyword "without",
-      Identifier <$> identifier,
+      WITH <$ keyword "with",
       -- Blob <$> undefined,
       -- Integer <$> undefined,
       -- Float <$> undefined,
@@ -406,7 +459,9 @@ token =
     string :: Lexer Text
     string =
       lexeme do
+        _ <- Megaparsec.char '\''
         chunks <- many (chunk <|> singleQuote)
+        _ <- Megaparsec.char '\''
         pure (Text.concat chunks)
       where
         chunk :: Lexer Text

@@ -6,11 +6,19 @@ version: 0
 common component
   build-depends:
     base,
+    bytestring,
+    containers,
+    megaparsec,
+    parser-combinators,
+    text,
+    unordered-containers,
   default-extensions:
     AllowAmbiguousTypes
     BlockArguments
     DataKinds
     DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
     DerivingVia
     DuplicateRecordFields
     FlexibleInstances
@@ -36,12 +44,13 @@ common component
 
 library
   import: component
+  exposed-modules: Keywords, Lexer, Lib
+
+test-suite tests
+  import: component
   build-depends:
-    bytestring,
-    containers,
-    megaparsec,
-    parser-combinators,
-    text,
-    unordered-containers,
-  exposed-modules: Lib
-  other-modules: Lexer
+    hedgehog,
+    sqlite-syntax,
+  hs-source-dirs: test
+  main-is: Test.hs
+  type: exitcode-stdio-1.0
