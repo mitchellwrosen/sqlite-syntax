@@ -11,6 +11,7 @@ import Data.Char
 import Data.Foldable (asum)
 import Data.Functor
 import Data.Int (Int64)
+import Data.List (foldl')
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Void (Void)
@@ -252,6 +253,8 @@ token =
       GreaterThanSignEqualsSign <$ symbol ">=",
       GreaterThanSignGreaterThanSign <$ symbol ">>",
       GreaterThanSign <$ symbol ">",
+      -- "try" because we might consume a '-' character, then fail to parse an integer
+      Megaparsec.try (Integer <$> integer),
       HyphenMinus <$ symbol "-",
       LeftParen <$ symbol "(",
       LessThanSignEqualsSign <$ symbol "<=",
@@ -418,7 +421,6 @@ token =
       WITHOUT <$ keyword "without",
       WITH <$ keyword "with",
       -- Blob <$> undefined,
-      -- Integer <$> undefined,
       -- Float <$> undefined,
       String <$> string
       -- TODO parameters
@@ -452,6 +454,13 @@ token =
           x <- Megaparsec.lowerChar
           xs <- Megaparsec.takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
           pure (Text.cons x xs)
+
+    integer :: Lexer Int64
+    integer =
+      lexeme do
+        f <- negate <$ Megaparsec.char '-' <|> pure id
+        digits <- Megaparsec.takeWhile1P Nothing isDigit
+        pure (f (foldl' (\n x -> n * 10 + fromIntegral (digitToInt x)) 0 (Text.unpack digits)))
 
     -- A string constant is formed by enclosing the string in single quotes ('). A single quote within the string can be
     -- encoded by putting two single quotes in a row - as in Pascal. C-style escapes using the backslash character are

@@ -10,7 +10,7 @@ import Prelude hiding (lex)
 
 main :: IO Bool
 main = do
-  (check . property) do
+  (check . withTests 10000 . property) do
     tokens0 <- forAll (Gen.list (Range.linear 1 10) genToken)
     let input0 = Text.unwords (map renderToken tokens0)
     case lex input0 of
@@ -194,11 +194,11 @@ genToken =
       pure WHERE,
       pure WINDOW,
       pure WITH,
-      pure WITHOUT
+      pure WITHOUT,
+      Integer <$> Gen.int64 (Range.constant minBound maxBound)
       -- Identifier <$> undefined,
       -- Blob <$> undefined,
       -- Float <$> undefined,
-      -- Integer <$> Gen.int64 (Range.constant minBound maxBound),
       -- String <$> undefined,
     ]
 
