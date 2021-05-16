@@ -3,6 +3,8 @@ module Main where
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Lazy as Text.Lazy
+import qualified Data.Text.Lazy.Builder as Text.Builder
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -196,8 +198,8 @@ genToken =
       pure WITH,
       pure WITHOUT,
       Number <$> genNumber,
-      String <$> Gen.text (Range.linear 0 10) Gen.unicode
-      -- Blob <$> undefined,
+      String <$> Gen.text (Range.linear 0 10) Gen.unicode,
+      Blob . elongateHexit <$> Gen.text (Range.linear 0 10) Gen.hexit
       -- Identifier <$> undefined,
     ]
   where
@@ -209,7 +211,7 @@ genToken =
           (\s0 s1 -> s0 <> s1) <$> genFractional <*> genExponent,
           (\s0 s1 -> s0 <> Text.pack s1)
             <$> Gen.element ["0x", "0X"]
-            <*> Gen.list (Range.linear 1 10) (Gen.element (['0' .. '9'] ++ ['A' .. 'F'] ++ ['a' .. 'f']))
+            <*> Gen.list (Range.linear 1 10) Gen.hexit
         ]
       where
         genDigits :: Gen Text
@@ -226,6 +228,12 @@ genToken =
         genFractional :: Gen Text
         genFractional =
           Text.cons '.' <$> genDigits
+
+    elongateHexit :: Text -> Text
+    elongateHexit s =
+      if even (Text.length s)
+        then s
+        else Text.cons '0' s
 
 -- Gen.int64 (Range.constant minBound maxBound),
 
@@ -250,7 +258,7 @@ renderToken = \case
   BEGIN -> "BEGIN"
   BETWEEN -> "BETWEEN"
   BY -> "BY"
-  Blob _ -> "Blob"
+  Blob s -> Text.Lazy.toStrict (Text.Builder.toLazyText ("x'" <> Text.Builder.fromText s <> "'"))
   CASCADE -> "CASCADE"
   CASE -> "CASE"
   CAST -> "CAST"
@@ -382,7 +390,8 @@ renderToken = \case
   SET -> "SET"
   Semicolon -> ";"
   Solidus -> "/"
-  String s -> "'" <> Text.replace "'" "''" s <> "'"
+  String s ->
+    Text.Lazy.toStrict (Text.Builder.toLazyText ("'" <> Text.Builder.fromText (Text.replace "'" "''" s) <> "'"))
   TABLE -> "TABLE"
   TEMP -> "TEMP"
   TEMPORARY -> "TEMPORARY"

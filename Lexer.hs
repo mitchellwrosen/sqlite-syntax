@@ -6,7 +6,6 @@ where
 
 import Control.Applicative ((<|>))
 import Control.Monad.Combinators (choice, many)
-import Data.ByteString (ByteString)
 import Data.Char
 import Data.Functor
 import Data.Text (Text)
@@ -42,7 +41,7 @@ data Token
   | BEGIN -- ^ @BEGIN@
   | BETWEEN -- ^ @BETWEEN@
   | BY -- ^ @BY@
-  | Blob ByteString
+  | Blob Text -- ^ @x'ff'@
   | CASCADE -- ^ @CASCADE@
   | CASE -- ^ @CASE@
   | CAST -- ^ @CAST@
@@ -245,7 +244,7 @@ token =
       EqualsSignEqualsSign <$ symbol "==",
       EqualsSign <$ symbol "=",
       ExclamationMarkEqualsSign <$ symbol "!=",
-      -- "try" because we might consume a '.' character, then fail to parse a number
+      -- "try" because we might consume a '.' character, then fail to parse a number, but the '.' was just a full stop
       Megaparsec.try (Number <$> number),
       FullStop <$ symbol ".",
       GreaterThanSignEqualsSign <$ symbol ">=",
@@ -265,6 +264,9 @@ token =
       Tilde <$ symbol "~",
       VerticalLineVerticalLine <$ symbol "||",
       VerticalLine <$ symbol "|",
+      -- "try" because we might consume an 'x' character, then fail to parse a blob, but the 'x' was part of an
+      -- identifier
+      Megaparsec.try (Blob <$> blob),
       Identifier <$> identifier,
       ABORT <$ keyword "abort",
       ACTION <$ keyword "action",
@@ -416,20 +418,30 @@ token =
       WINDOW <$ keyword "window",
       WITHOUT <$ keyword "without",
       WITH <$ keyword "with",
-      -- Blob <$> undefined,
       String <$> string
       -- TODO parameters
     ]
   where
+    blob :: Lexer Text
+    blob =
+      lexeme do
+        _ <- Megaparsec.char' 'x'
+        _ <- Megaparsec.char '\''
+        s <- Megaparsec.takeWhileP Nothing isHexDigit
+        _ <- Megaparsec.char '\''
+        if even (Text.length s)
+          then pure s
+          else fail "invalid hex data"
+
     -- It appears any string is a valid identifier, even the empty string, except strings that begin with "sqlite_".
     -- There are three different ways of quoting identifiers ("this", [this], and `this`), and within a quoted
     -- identifier, I don't believe there is any escape syntax. (It seems impossible, therefore, to define an identifer
-    -- that happens to have a ", ], and ` character...). Still looking for official documentation on all of this. This is
-    -- all I've found:
+    -- that happens to have a ", ], and ` character...). Still looking for official documentation on all of this. This
+    -- is all I've found:
     --
     --   https://stackoverflow.com/questions/3694276/what-are-valid-table-names-in-sqlite
     identifier :: Lexer Text
-    identifier = do
+    identifier =
       lexeme do
         s <- unquoted <|> quoted '"' '"' <|> quoted '[' ']' <|> quoted '`' '`'
         if "sqlite_" `Text.isPrefixOf` s
@@ -450,6 +462,42 @@ token =
           xs <- Megaparsec.takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
           pure (Text.cons x xs)
 
+    number :: Lexer Text
+    number =
+      lexeme do
+        choice
+          [ Megaparsec.try do
+              s0 <- Megaparsec.string' "0x"
+              s1 <- Megaparsec.takeWhile1P Nothing isHexDigit
+              pure (s0 <> s1),
+            do
+              s0 <- Megaparsec.takeWhileP Nothing isDigit
+              s1 <- if Text.null s0 then fractional else (fractional <|> pure "")
+              s2 <- exponent <|> pure ""
+              pure (s0 <> s1 <> s2)
+          ]
+      where
+        digits :: Lexer Text
+        digits =
+          Megaparsec.takeWhile1P Nothing isDigit
+
+        exponent :: Lexer Text
+        exponent = do
+          s0 <- Megaparsec.satisfy \c -> c == 'e' || c == 'E'
+          s1 <- sign <|> pure ""
+          s2 <- digits
+          pure (Text.cons s0 (s1 <> s2))
+          where
+            sign :: Lexer Text
+            sign =
+              Text.singleton <$> Megaparsec.satisfy \c -> c == '+' || c == '-'
+
+        fractional :: Lexer Text
+        fractional = do
+          s0 <- Megaparsec.char '.'
+          s1 <- digits
+          pure (Text.cons s0 s1)
+
     -- A string constant is formed by enclosing the string in single quotes ('). A single quote within the string can be
     -- encoded by putting two single quotes in a row - as in Pascal. C-style escapes using the backslash character are
     -- not supported because they are not standard SQL.
@@ -468,39 +516,3 @@ token =
         singleQuote :: Lexer Text
         singleQuote =
           "'" <$ Megaparsec.string "''"
-
-number :: Lexer Text
-number =
-  lexeme do
-    choice
-      [ Megaparsec.try do
-          s0 <- Megaparsec.string' "0x"
-          s1 <- Megaparsec.takeWhile1P Nothing isHexDigit
-          pure (s0 <> s1),
-        do
-          s0 <- Megaparsec.takeWhileP Nothing isDigit
-          s1 <- if Text.null s0 then fractional else (fractional <|> pure "")
-          s2 <- exponent <|> pure ""
-          pure (s0 <> s1 <> s2)
-      ]
-  where
-    digits :: Lexer Text
-    digits =
-      Megaparsec.takeWhile1P Nothing isDigit
-
-    exponent :: Lexer Text
-    exponent = do
-      s0 <- Megaparsec.satisfy \c -> c == 'e' || c == 'E'
-      s1 <- sign <|> pure ""
-      s2 <- digits
-      pure (Text.cons s0 (s1 <> s2))
-      where
-        sign :: Lexer Text
-        sign =
-          Text.singleton <$> Megaparsec.satisfy \c -> c == '+' || c == '-'
-
-    fractional :: Lexer Text
-    fractional = do
-      s0 <- Megaparsec.char '.'
-      s1 <- digits
-      pure (Text.cons s0 s1)
