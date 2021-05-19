@@ -44,7 +44,7 @@ common component
 
 library
   import: component
-  exposed-modules: Keywords, Lexer, Lib
+  exposed-modules: Keywords, Lexer, Lib, TextParser
 
 test-suite tests
   import: component

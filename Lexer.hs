@@ -4,21 +4,16 @@ module Lexer
   )
 where
 
-import Control.Applicative ((<|>))
-import Control.Monad.Combinators (choice, many)
+import Control.Applicative (many, (<|>))
+import Control.Monad.Combinators (choice)
 import Data.Char
 import Data.Functor
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Void (Void)
 import GHC.Generics (Generic)
-import qualified Text.Megaparsec as Megaparsec
-import qualified Text.Megaparsec.Char as Megaparsec
-import qualified Text.Megaparsec.Char.Lexer as Megaparsec.Lexer
+import TextParser (TextParser)
+import qualified TextParser
 import Prelude hiding (Bool (..), exponent, lex)
-
-type Lexer =
-  Megaparsec.Parsec Void Text
 
 {- ORMOLU_DISABLE -}
 data Token
@@ -203,39 +198,27 @@ data Token
   deriving stock (Eq, Generic, Show)
 {- ORMOLU_ENABLE -}
 
-keyword :: Text -> Lexer Text
-keyword =
-  Megaparsec.Lexer.symbol' space
+keyword :: Text -> TextParser Text
+keyword s =
+  TextParser.string' s <* space
 
-lexeme :: Lexer a -> Lexer a
-lexeme =
-  Megaparsec.Lexer.lexeme space
-
-space :: Lexer ()
+space :: TextParser ()
 space =
-  Megaparsec.Lexer.space
-    Megaparsec.space1
-    (Megaparsec.Lexer.skipLineComment "--")
-    (Megaparsec.Lexer.skipBlockComment "/*" "*/")
+  TextParser.space "--" "/*" "*/"
 
-symbol :: Text -> Lexer Text
-symbol =
-  Megaparsec.Lexer.symbol space
+symbol :: Text -> TextParser Text
+symbol s =
+  TextParser.string s <* space
 
 lex :: Text -> Either Text [Token]
-lex input =
-  case Megaparsec.parse lexer "" input of
-    Left err -> Left (Text.pack (Megaparsec.errorBundlePretty err))
-    Right tokens -> Right tokens
-  where
-    lexer :: Lexer [Token]
-    lexer = do
-      space
-      tokens <- many token
-      Megaparsec.eof
-      pure tokens
+lex =
+  TextParser.run do
+    space
+    tokens <- many token
+    TextParser.eof
+    pure tokens
 
-token :: Lexer Token
+token :: TextParser Token
 token =
   choice
     [ Ampersand <$ symbol "&",
@@ -244,8 +227,7 @@ token =
       EqualsSignEqualsSign <$ symbol "==",
       EqualsSign <$ symbol "=",
       ExclamationMarkEqualsSign <$ symbol "!=",
-      -- "try" because we might consume a '.' character, then fail to parse a number, but the '.' was just a full stop
-      Megaparsec.try (Number <$> number),
+      Number <$> number,
       FullStop <$ symbol ".",
       GreaterThanSignEqualsSign <$ symbol ">=",
       GreaterThanSignGreaterThanSign <$ symbol ">>",
@@ -264,9 +246,7 @@ token =
       Tilde <$ symbol "~",
       VerticalLineVerticalLine <$ symbol "||",
       VerticalLine <$ symbol "|",
-      -- "try" because we might consume an 'x' character, then fail to parse a blob, but the 'x' was part of an
-      -- identifier
-      Megaparsec.try (Blob <$> blob),
+      Blob <$> blob,
       Identifier <$> identifier,
       ABORT <$ keyword "abort",
       ACTION <$ keyword "action",
@@ -422,16 +402,15 @@ token =
       -- TODO parameters
     ]
   where
-    blob :: Lexer Text
-    blob =
-      lexeme do
-        _ <- Megaparsec.char' 'x'
-        _ <- Megaparsec.char '\''
-        s <- Megaparsec.takeWhileP Nothing isHexDigit
-        _ <- Megaparsec.char '\''
-        if even (Text.length s)
-          then pure s
-          else fail "invalid hex data"
+    blob :: TextParser Text
+    blob = do
+      _ <- TextParser.string' "X\'" <|> TextParser.string' "x\'"
+      TextParser.commit
+      s <- TextParser.takeWhile isHexDigit
+      _ <- TextParser.char '\''
+      if even (Text.length s)
+        then s <$ space
+        else fail "invalid hex data"
 
     -- It appears any string is a valid identifier, even the empty string, except strings that begin with "sqlite_".
     -- There are three different ways of quoting identifiers ("this", [this], and `this`), and within a quoted
@@ -440,79 +419,94 @@ token =
     -- is all I've found:
     --
     --   https://stackoverflow.com/questions/3694276/what-are-valid-table-names-in-sqlite
-    identifier :: Lexer Text
-    identifier =
-      lexeme do
-        s <- unquoted <|> quoted '"' '"' <|> quoted '[' ']' <|> quoted '`' '`'
-        if "sqlite_" `Text.isPrefixOf` s
-          then fail "reserved identifier"
-          else pure s
+    identifier :: TextParser Text
+    identifier = do
+      s <- unquoted <|> quoted '"' '"' <|> quoted '[' ']' <|> quoted '`' '`'
+      if "sqlite_" `Text.isPrefixOf` s
+        then fail "reserved identifier"
+        else do
+          space
+          pure s
       where
-        quoted :: Char -> Char -> Lexer Text
+        quoted :: Char -> Char -> TextParser Text
         quoted c0 c1 = do
-          _ <- Megaparsec.char c0
-          s <- Megaparsec.takeWhileP Nothing \c -> '\x20' <= c && c <= '\x10FFFF' && c /= c1
-          _ <- Megaparsec.char c1
+          _ <- TextParser.char c0
+          TextParser.commit
+          s <- TextParser.takeWhile \c -> '\x20' <= c && c <= '\x10FFFF' && c /= c1
+          _ <- TextParser.char c1
           pure s
 
         -- This is just a guess for now. Still looking for official documentation.
-        unquoted :: Lexer Text
+        unquoted :: TextParser Text
         unquoted = do
-          x <- Megaparsec.lowerChar
-          xs <- Megaparsec.takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
+          x <- TextParser.satisfy isLower
+          TextParser.commit
+          xs <- TextParser.takeWhile (\c -> isAlphaNum c || c == '_')
           pure (Text.cons x xs)
 
-    number :: Lexer Text
+    number :: TextParser Text
     number =
-      lexeme do
-        choice
-          [ Megaparsec.try do
-              s0 <- Megaparsec.string' "0x"
-              s1 <- Megaparsec.takeWhile1P Nothing isHexDigit
-              pure (s0 <> s1),
-            do
-              s0 <- Megaparsec.takeWhileP Nothing isDigit
-              s1 <- if Text.null s0 then fractional else (fractional <|> pure "")
-              s2 <- exponent <|> pure ""
-              pure (s0 <> s1 <> s2)
-          ]
+      choice
+        [ do
+            s0 <- TextParser.string' "0x"
+            TextParser.commit
+            s1 <- TextParser.takeWhile1 isHexDigit
+            pure (s0 <> s1),
+          do
+            s0 <- TextParser.takeWhile isDigit
+            s1 <-
+              if Text.null s0
+                then do
+                  TextParser.char_ '.'
+                  s1 <- digits
+                  TextParser.commit
+                  pure (Text.cons '.' s1)
+                else do
+                  TextParser.commit
+                  ( do
+                      TextParser.char_ '.'
+                      TextParser.commit
+                      s1 <- digits
+                      pure (Text.cons '.' s1)
+                    )
+                    <|> pure ""
+            s2 <- exponent <|> pure ""
+            pure (s0 <> s1 <> s2)
+        ]
+        <* space
       where
-        digits :: Lexer Text
+        digits :: TextParser Text
         digits =
-          Megaparsec.takeWhile1P Nothing isDigit
+          TextParser.takeWhile1 isDigit
 
-        exponent :: Lexer Text
+        exponent :: TextParser Text
         exponent = do
-          s0 <- Megaparsec.satisfy \c -> c == 'e' || c == 'E'
+          s0 <- TextParser.satisfy \c -> c == 'e' || c == 'E'
+          TextParser.commit
           s1 <- sign <|> pure ""
           s2 <- digits
           pure (Text.cons s0 (s1 <> s2))
           where
-            sign :: Lexer Text
+            sign :: TextParser Text
             sign =
-              Text.singleton <$> Megaparsec.satisfy \c -> c == '+' || c == '-'
-
-        fractional :: Lexer Text
-        fractional = do
-          s0 <- Megaparsec.char '.'
-          s1 <- digits
-          pure (Text.cons s0 s1)
+              Text.singleton <$> TextParser.satisfy \c -> c == '+' || c == '-'
 
     -- A string constant is formed by enclosing the string in single quotes ('). A single quote within the string can be
     -- encoded by putting two single quotes in a row - as in Pascal. C-style escapes using the backslash character are
     -- not supported because they are not standard SQL.
-    string :: Lexer Text
-    string =
-      lexeme do
-        _ <- Megaparsec.char '\''
-        chunks <- many (chunk <|> singleQuote)
-        _ <- Megaparsec.char '\''
-        pure (Text.concat chunks)
+    string :: TextParser Text
+    string = do
+      _ <- TextParser.char '\''
+      TextParser.commit
+      chunks <- many (chunk <|> singleQuote)
+      _ <- TextParser.char '\''
+      space
+      pure (Text.concat chunks)
       where
-        chunk :: Lexer Text
+        chunk :: TextParser Text
         chunk =
-          Megaparsec.takeWhile1P Nothing \c -> '\x20' <= c && c <= '\x10FFFF' && c /= '\''
+          TextParser.takeWhile1 \c -> ' ' <= c && c <= '\x10FFFF' && c /= '\''
 
-        singleQuote :: Lexer Text
+        singleQuote :: TextParser Text
         singleQuote =
-          "'" <$ Megaparsec.string "''"
+          "'" <$ TextParser.string "''"
