@@ -1,4 +1,4 @@
-module Lexer
+module Sqlite.Syntax.Lexer
   ( Token (..),
     lex,
   )

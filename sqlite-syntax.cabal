@@ -44,7 +44,12 @@ common component
 
 library
   import: component
-  exposed-modules: Lexer, Lib, TextParser
+  exposed-modules:
+    Sqlite.Syntax.Lexer
+    Sqlite.Syntax.Parser
+  hs-source-dirs: src
+  other-modules:
+    TextParser
 
 test-suite tests
   import: component
