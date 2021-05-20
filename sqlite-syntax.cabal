@@ -8,6 +8,7 @@ common component
     base,
     bytestring,
     containers,
+    Earley,
     megaparsec,
     parser-combinators,
     text,
