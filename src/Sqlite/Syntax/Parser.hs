@@ -2,6 +2,7 @@ module Sqlite.Syntax.Parser where
 
 import Control.Applicative
 import Control.Applicative.Combinators (choice)
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Sqlite.Syntax.Parser.Token
 import qualified Text.Earley as Earley
@@ -20,6 +21,27 @@ data Syntax
   | Syntax'BeginStatement BeginStatement
   | Syntax'CommitStatement
   | Syntax'RollbackStatement RollbackStatement
+  | Syntax'CreateIndexStatement TODO
+  | Syntax'CreateTableStatement TODO
+  | Syntax'CreateTriggerStatement TODO
+  | Syntax'CreateViewStatement TODO
+  | Syntax'CreateVirtualTableStatement TODO
+  | Syntax'DeleteStatement TODO
+  | Syntax'DetachStatement TODO
+  | Syntax'DropIndexStatement TODO
+  | Syntax'DropTableStatement TODO
+  | Syntax'DropTriggerStatement TODO
+  | Syntax'DropViewStatement TODO
+  | Syntax'InsertStatement TODO
+  | Syntax'PragmaStatement TODO
+  | Syntax'ReindexStatement TODO
+  | Syntax'ReleaseStatement TODO
+  | Syntax'SavepointStatement TODO
+  | Syntax'SelectStatement TODO
+  | Syntax'UpdateStatement TODO
+  | Syntax'VacuumStatement TODO
+
+data TODO
 
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
@@ -92,6 +114,13 @@ beginStatement =
   BeginStatement
     <$> (begin *> optional transactionType <* optional transaction)
 
+newtype ColumnAlias
+  = ColumnAlias Text
+
+columnAlias :: Parser r ColumnAlias
+columnAlias =
+  ColumnAlias <$> undefined
+
 -- | https://sqlite.org/syntax/column-constraint.html
 data ColumnConstraint
   = ColumnConstraint (Maybe ConstraintName) ColumnConstraintType
@@ -108,9 +137,9 @@ data ColumnConstraintType
   | ColumnConstraintType'Default Default
   | ColumnConstraintType'ForeignKey ForeignKeyClause
   | ColumnConstraintType'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraintType'NotNull (Maybe ConflictClause)
-  | ColumnConstraintType'PrimaryKey (Maybe Ordering) (Maybe ConflictClause) Bool
-  | ColumnConstraintType'Unique (Maybe ConflictClause)
+  | ColumnConstraintType'NotNull (Maybe OnConflictClause)
+  | ColumnConstraintType'PrimaryKey (Maybe Ordering) (Maybe OnConflictClause) Bool
+  | ColumnConstraintType'Unique (Maybe OnConflictClause)
 
 makeColumnConstraintType :: Parser r Expression -> Parser r ColumnConstraintType
 makeColumnConstraintType expression =
@@ -131,13 +160,13 @@ makeColumnConstraintType expression =
         <$> (optional (generated *> always) *> as *> parens expression)
         <*> optional generatedType,
       ColumnConstraintType'NotNull
-        <$> (not *> null *> optional conflictClause),
+        <$> (not *> null *> optional onConflictClause),
       ColumnConstraintType'PrimaryKey
         <$> (primary *> key *> optional ordering)
-        <*> optional conflictClause
+        <*> optional onConflictClause
         <*> (True <$ autoincrement <|> pure False),
       ColumnConstraintType'Unique
-        <$> (unique *> optional conflictClause)
+        <$> (unique *> optional onConflictClause)
     ]
 
 -- | https://sqlite.org/syntax/column-def.html
@@ -166,23 +195,23 @@ columnName =
   ColumnName <$> identifier
 
 -- | https://sqlite.org/syntax/conflict-clause.html
-data ConflictClause
-  = ConflictClause'Abort
-  | ConflictClause'Fail
-  | ConflictClause'Ignore
-  | ConflictClause'Replace
-  | ConflictClause'Rollback
+data OnConflictClause
+  = OnConflictClause'Abort
+  | OnConflictClause'Fail
+  | OnConflictClause'Ignore
+  | OnConflictClause'Replace
+  | OnConflictClause'Rollback
 
-conflictClause :: Parser r ConflictClause
-conflictClause =
+onConflictClause :: Parser r OnConflictClause
+onConflictClause =
   on
     *> conflict
     *> choice
-      [ ConflictClause'Abort <$ abort,
-        ConflictClause'Fail <$ fail,
-        ConflictClause'Ignore <$ ignore,
-        ConflictClause'Replace <$ replace,
-        ConflictClause'Rollback <$ rollback
+      [ OnConflictClause'Abort <$ abort,
+        OnConflictClause'Fail <$ fail,
+        OnConflictClause'Ignore <$ ignore,
+        OnConflictClause'Replace <$ replace,
+        OnConflictClause'Rollback <$ rollback
       ]
 
 newtype ConstraintName
@@ -261,6 +290,23 @@ ordering =
     [ Ordering'Asc <$ asc,
       Ordering'Desc <$ desc
     ]
+
+-- | https://sqlite.org/syntax/qualified-table-name.html
+data QualifiedTableName
+
+-- | https://sqlite.org/syntax/returning-clause.html
+newtype ReturningClause
+  = ReturningClause (NonEmpty ReturningClauseItem)
+
+makeReturningClause :: Parser r ReturningClauseItem -> Parser r ReturningClause
+makeReturningClause = undefined
+
+data ReturningClauseItem
+  = ReturningClauseItem'All
+  | ReturningClauseItem'Expression Expression (Maybe ColumnAlias)
+
+makeReturningClauseItem :: Parser r Expression -> Parser r ReturningClauseItem
+makeReturningClauseItem = undefined
 
 -- | https://sqlite.org/syntax/rollback-stmt.html
 newtype RollbackStatement
