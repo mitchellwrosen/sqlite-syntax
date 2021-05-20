@@ -16,15 +16,23 @@ parens p =
 data Syntax
   = Syntax'AlterTableStatement AlterTableStatement
   | Syntax'AnalyzeStatement AnalyzeStatement
+  | Syntax'AttachStatement AttachStatement
 
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
+  expression <- Earley.rule (makeExpression expression)
+
   let alterTableStatement = makeAlterTableStatement columnDefinition
-  let columnDefinition = undefined
+      attachStatement = makeAttachStatement expression
+      columnConstraint = makeColumnConstraint columnConstraintType
+      columnConstraintType = makeColumnConstraintType expression
+      columnDefinition = makeColumnDefinition columnConstraint
+
   pure do
     choice
       [ Syntax'AlterTableStatement <$> alterTableStatement,
-        Syntax'AnalyzeStatement <$> analyzeStatement
+        Syntax'AnalyzeStatement <$> analyzeStatement,
+        Syntax'AttachStatement <$> attachStatement
       ]
 
 --
@@ -57,6 +65,16 @@ analyzeStatement :: Parser r AnalyzeStatement
 analyzeStatement =
   AnalyzeStatement
     <$> (analyze *> optional (schemaQualified indexOrTableName))
+
+-- | https://sqlite.org/lang_attach.html
+data AttachStatement
+  = AttachStatement Expression SchemaName
+
+makeAttachStatement :: Parser r Expression -> Parser r AttachStatement
+makeAttachStatement expression =
+  AttachStatement
+    <$> (attach *> optional database *> expression)
+    <*> (as *> schemaName)
 
 -- | https://sqlite.org/syntax/column-constraint.html
 data ColumnConstraint
@@ -165,9 +183,10 @@ data Default
 
 data Expression
 
-makeExpression :: Parser r Expression
-makeExpression = undefined
+makeExpression :: Parser r Expression -> Parser r Expression
+makeExpression _expression = undefined
 
+-- | https://sqlite.org/syntax/foreign-key-clause.html
 data ForeignKeyClause
 
 foreignKeyClause :: Parser r ForeignKeyClause

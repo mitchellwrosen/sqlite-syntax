@@ -36,6 +36,10 @@ asc :: Parser r Lexer.Token
 asc =
   Earley.token Lexer.ASC
 
+attach :: Parser r Lexer.Token
+attach =
+  Earley.token Lexer.ATTACH
+
 autoincrement :: Parser r Lexer.Token
 autoincrement =
   Earley.token Lexer.AUTOINCREMENT
@@ -77,6 +81,10 @@ currentTime =
 currentTimestamp :: Parser r Lexer.Token
 currentTimestamp =
   Earley.token Lexer.CURRENT_TIMESTAMP
+
+database :: Parser r Lexer.Token
+database =
+  Earley.token Lexer.DATABASE
 
 desc :: Parser r Lexer.Token
 desc =
