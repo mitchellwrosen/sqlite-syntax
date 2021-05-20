@@ -18,6 +18,10 @@ alter :: Parser r Lexer.Token
 alter =
   Earley.token Lexer.ALTER
 
+analyze :: Parser r Lexer.Token
+analyze =
+  Earley.token Lexer.ANALYZE
+
 column :: Parser r Lexer.Token
 column =
   Earley.token Lexer.COLUMN
@@ -52,13 +56,12 @@ to =
 
 -- | https://sqlite.org/lang_altertable.html
 data AlterTableStatement
-  = AlterTableStatement (Maybe SchemaName) TableName TableAlteration
+  = AlterTableStatement (SchemaQualified TableName) TableAlteration
 
 makeAlterTableStatement :: Parser r ColumnDefinition -> Parser r AlterTableStatement
 makeAlterTableStatement columnDefinition =
   AlterTableStatement
-    <$> (alter *> table *> optional schemaName <* fullStop)
-    <*> tableName
+    <$> (alter *> table *> schemaQualified tableName)
     <*> choice
       [ TableAlteration'AddColumn
           <$> columnDefinition,
@@ -70,6 +73,15 @@ makeAlterTableStatement columnDefinition =
           <$> (rename *> optional column *> columnName)
           <*> (to *> columnName)
       ]
+
+-- | https://sqlite.org/lang_analyze.html
+data AnalyzeStatement
+  = AnalyzeStatement (Maybe (SchemaQualified IndexOrTableName))
+
+analyzeStatement :: Parser r AnalyzeStatement
+analyzeStatement =
+  AnalyzeStatement
+    <$> (analyze *> optional (schemaQualified indexOrTableName))
 
 -- TODO
 data ColumnConstraint
@@ -84,12 +96,28 @@ columnName :: Parser r ColumnName
 columnName =
   ColumnName <$> identifier
 
+newtype IndexOrTableName
+  = IndexOrTableName Text
+
+indexOrTableName :: Parser r IndexOrTableName
+indexOrTableName =
+  IndexOrTableName <$> identifier
+
 newtype SchemaName
   = SchemaName Text
 
 schemaName :: Parser r SchemaName
 schemaName =
   SchemaName <$> identifier
+
+data SchemaQualified a
+  = SchemaQualified (Maybe SchemaName) a
+
+schemaQualified :: Parser r a -> Parser r (SchemaQualified a)
+schemaQualified p =
+  SchemaQualified
+    <$> (optional schemaName <* fullStop)
+    <*> p
 
 data TableAlteration
   = TableAlteration'AddColumn ColumnDefinition
