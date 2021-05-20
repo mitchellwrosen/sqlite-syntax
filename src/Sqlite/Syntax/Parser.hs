@@ -243,10 +243,26 @@ schemaQualified p =
     <$> (optional schemaName <* fullStop)
     <*> p
 
+data Sign
+  = Sign'HyphenMinus
+  | Sign'PlusSign
+
+sign :: Parser r Sign
+sign =
+  choice
+    [ Sign'HyphenMinus <$ hyphenMinus,
+      Sign'PlusSign <$ plusSign
+    ]
+
+-- | https://sqlite.org/syntax/signed-number.html
 data SignedNumber
+  = SignedNumber (Maybe Sign) Text
 
 signedNumber :: Parser r SignedNumber
-signedNumber = undefined
+signedNumber =
+  SignedNumber
+    <$> optional sign
+    <*> number
 
 data TableAlteration
   = TableAlteration'AddColumn ColumnDefinition

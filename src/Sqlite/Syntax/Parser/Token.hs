@@ -102,6 +102,10 @@ generated :: Parser r Lexer.Token
 generated =
   Earley.token Lexer.GENERATED
 
+hyphenMinus :: Parser r Lexer.Token
+hyphenMinus =
+  Earley.token Lexer.HyphenMinus
+
 identifier :: Parser r Text
 identifier =
   Earley.terminal \case
@@ -137,6 +141,10 @@ number =
 on :: Parser r Lexer.Token
 on =
   Earley.token Lexer.ON
+
+plusSign :: Parser r Lexer.Token
+plusSign =
+  Earley.token Lexer.PlusSign
 
 primary :: Parser r Lexer.Token
 primary =
