@@ -16,6 +16,10 @@ parens :: Parser r a -> Parser r a
 parens p =
   leftParenthesis *> p <* rightParenthesis
 
+perhaps :: Parser r a -> Parser r Bool
+perhaps p =
+  choice [True <$ p, pure False]
+
 --
 
 data Syntax
@@ -50,13 +54,14 @@ data TODO
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
   expression <- Earley.rule (makeExpression expression)
+  indexedColumn <- Earley.rule (makeIndexedColumn expression)
 
   let alterTableStatement = makeAlterTableStatement columnDefinition
       attachStatement = makeAttachStatement expression
       columnConstraint = makeColumnConstraint columnConstraintType
       columnConstraintType = makeColumnConstraintType expression
       columnDefinition = makeColumnDefinition columnConstraint
-      createIndexStatement = makeCreateIndexStatement expression
+      createIndexStatement = makeCreateIndexStatement expression indexedColumn
 
   pure do
     choice
@@ -170,7 +175,7 @@ makeColumnConstraintType expression =
       ColumnConstraintType'PrimaryKey
         <$> (primary *> key *> optional ordering)
         <*> optional onConflictClause
-        <*> (True <$ autoincrement <|> pure False),
+        <*> perhaps autoincrement,
       ColumnConstraintType'Unique
         <$> (unique *> optional onConflictClause)
     ]
@@ -231,8 +236,8 @@ constraintName =
 data CreateIndexStatement
   = CreateIndexStatement Bool Bool (SchemaQualified IndexName) TableName (NonEmpty IndexedColumn) (Maybe Expression)
 
-makeCreateIndexStatement :: Parser r Expression -> Parser r CreateIndexStatement
-makeCreateIndexStatement expression =
+makeCreateIndexStatement :: Parser r Expression -> Parser r IndexedColumn -> Parser r CreateIndexStatement
+makeCreateIndexStatement expression indexedColumn =
   CreateIndexStatement
     <$> (create *> perhaps unique)
     <*> (index *> perhaps (if_ *> not *> exists))
@@ -240,10 +245,6 @@ makeCreateIndexStatement expression =
     <*> (on *> tableName)
     <*> parens (commaSep1 indexedColumn)
     <*> optional (where_ *> expression)
-
-perhaps :: Parser r a -> Parser r Bool
-perhaps p =
-  choice [True <$ p, pure False]
 
 data Default
   = Default'Expression Expression
@@ -285,10 +286,19 @@ indexOrTableName :: Parser r IndexOrTableName
 indexOrTableName =
   IndexOrTableName <$> identifier
 
+-- | https://sqlite.org/syntax/indexed-column.html
 data IndexedColumn
+  = IndexedColumn (Either ColumnName Expression) (Maybe CollationName) (Maybe Ordering)
 
-indexedColumn :: Parser r IndexedColumn
-indexedColumn = undefined
+makeIndexedColumn :: Parser r Expression -> Parser r IndexedColumn
+makeIndexedColumn expression =
+  IndexedColumn
+    <$> choice
+      [ Left <$> columnName,
+        Right <$> expression
+      ]
+    <*> optional (collate *> collationName)
+    <*> optional ordering
 
 data LiteralValue
   = LiteralValue'BlobLiteral Text
