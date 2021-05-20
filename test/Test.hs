@@ -119,7 +119,7 @@ genToken =
       pure LEFT,
       pure LIKE,
       pure LIMIT,
-      pure LeftParen,
+      pure LeftParenthesis,
       pure LessThanSign,
       pure LessThanSignEqualsSign,
       pure LessThanSignGreaterThanSign,
@@ -165,10 +165,11 @@ genToken =
       pure ROW,
       pure ROWID,
       pure ROWS,
-      pure RightParen,
+      pure RightParenthesis,
       pure SAVEPOINT,
       pure SELECT,
       pure SET,
+      pure STORED,
       pure Semicolon,
       pure Solidus,
       pure TABLE,
@@ -337,7 +338,7 @@ renderToken = \case
   LEFT -> "LEFT"
   LIKE -> "LIKE"
   LIMIT -> "LIMIT"
-  LeftParen -> "("
+  LeftParenthesis -> "("
   LessThanSign -> "<"
   LessThanSignEqualsSign -> "<="
   LessThanSignGreaterThanSign -> "<>"
@@ -384,10 +385,11 @@ renderToken = \case
   ROW -> "ROW"
   ROWID -> "ROWID"
   ROWS -> "ROWS"
-  RightParen -> ")"
+  RightParenthesis -> ")"
   SAVEPOINT -> "SAVEPOINT"
   SELECT -> "SELECT"
   SET -> "SET"
+  STORED -> "STORED"
   Semicolon -> ";"
   Solidus -> "/"
   String s ->

@@ -115,7 +115,7 @@ data Token
   | LEFT -- ^ @LEFT@
   | LIKE -- ^ @LIKE@
   | LIMIT -- ^ @LIMIT@
-  | LeftParen -- ^ @(@
+  | LeftParenthesis -- ^ @(@
   | LessThanSign -- ^ @<@
   | LessThanSignEqualsSign -- ^ @<=@
   | LessThanSignGreaterThanSign -- ^ @<>@
@@ -162,10 +162,11 @@ data Token
   | ROW -- ^ @ROW@
   | ROWID -- ^ @ROWID@
   | ROWS -- ^ @ROWS@
-  | RightParen -- ^ @)@
+  | RightParenthesis -- ^ @)@
   | SAVEPOINT -- ^ @SAVEPOINT@
   | SELECT -- ^ @SELECT@
   | SET -- ^ @SET@
+  | STORED -- ^ @STORED@
   | Semicolon -- ^ @;@
   | Solidus -- ^ @/@
   | String Text
@@ -233,14 +234,14 @@ token =
       GreaterThanSignGreaterThanSign <$ symbol ">>",
       GreaterThanSign <$ symbol ">",
       HyphenMinus <$ symbol "-",
-      LeftParen <$ symbol "(",
+      LeftParenthesis <$ symbol "(",
       LessThanSignEqualsSign <$ symbol "<=",
       LessThanSignGreaterThanSign <$ symbol "<>",
       LessThanSignLessThanSign <$ symbol "<<",
       LessThanSign <$ symbol "<",
       PercentSign <$ symbol "%",
       PlusSign <$ symbol "+",
-      RightParen <$ symbol ")",
+      RightParenthesis <$ symbol ")",
       Semicolon <$ symbol ";",
       Solidus <$ symbol "/",
       Tilde <$ symbol "~",
@@ -375,6 +376,7 @@ token =
       SAVEPOINT <$ keyword "savepoint",
       SELECT <$ keyword "select",
       SET <$ keyword "set",
+      STORED <$ keyword "stored",
       TABLE <$ keyword "table",
       TEMPORARY <$ keyword "temporary",
       TEMP <$ keyword "temp",
