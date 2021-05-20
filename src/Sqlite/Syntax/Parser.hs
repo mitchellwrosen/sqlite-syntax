@@ -17,6 +17,7 @@ data Syntax
   = Syntax'AlterTableStatement AlterTableStatement
   | Syntax'AnalyzeStatement AnalyzeStatement
   | Syntax'AttachStatement AttachStatement
+  | Syntax'BeginStatement BeginStatement
 
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
@@ -32,7 +33,8 @@ syntax = mdo
     choice
       [ Syntax'AlterTableStatement <$> alterTableStatement,
         Syntax'AnalyzeStatement <$> analyzeStatement,
-        Syntax'AttachStatement <$> attachStatement
+        Syntax'AttachStatement <$> attachStatement,
+        Syntax'BeginStatement <$> beginStatement
       ]
 
 --
@@ -66,7 +68,7 @@ analyzeStatement =
   AnalyzeStatement
     <$> (analyze *> optional (schemaQualified indexOrTableName))
 
--- | https://sqlite.org/lang_attach.html
+-- | https://sqlite.org/syntax/attach-stmt.html
 data AttachStatement
   = AttachStatement Expression SchemaName
 
@@ -75,6 +77,15 @@ makeAttachStatement expression =
   AttachStatement
     <$> (attach *> optional database *> expression)
     <*> (as *> schemaName)
+
+-- | https://sqlite.org/syntax/begin-stmt.html
+newtype BeginStatement
+  = BeginStatement (Maybe TransactionType)
+
+beginStatement :: Parser r BeginStatement
+beginStatement =
+  BeginStatement
+    <$> (begin *> optional transactionType <* optional transaction)
 
 -- | https://sqlite.org/syntax/column-constraint.html
 data ColumnConstraint
@@ -295,6 +306,19 @@ newtype TableName
 tableName :: Parser r TableName
 tableName =
   TableName <$> identifier
+
+data TransactionType
+  = TransactionType'Deferred
+  | TransactionType'Exclusive
+  | TransactionType'Immediate
+
+transactionType :: Parser r TransactionType
+transactionType =
+  choice
+    [ TransactionType'Deferred <$ deferred,
+      TransactionType'Exclusive <$ exclusive,
+      TransactionType'Immediate <$ immediate
+    ]
 
 newtype TypeName
   = TypeName Text

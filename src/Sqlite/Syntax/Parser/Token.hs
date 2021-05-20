@@ -44,6 +44,10 @@ autoincrement :: Parser r Lexer.Token
 autoincrement =
   Earley.token Lexer.AUTOINCREMENT
 
+begin :: Parser r Lexer.Token
+begin =
+  Earley.token Lexer.BEGIN
+
 blob :: Parser r Text
 blob =
   Earley.terminal \case
@@ -86,6 +90,10 @@ database :: Parser r Lexer.Token
 database =
   Earley.token Lexer.DATABASE
 
+deferred :: Parser r Lexer.Token
+deferred =
+  Earley.token Lexer.DEFERRED
+
 desc :: Parser r Lexer.Token
 desc =
   Earley.token Lexer.DESC
@@ -93,6 +101,10 @@ desc =
 drop :: Parser r Lexer.Token
 drop =
   Earley.token Lexer.DROP
+
+exclusive :: Parser r Lexer.Token
+exclusive =
+  Earley.token Lexer.EXCLUSIVE
 
 fail :: Parser r Lexer.Token
 fail =
@@ -123,6 +135,10 @@ identifier =
 ignore :: Parser r Lexer.Token
 ignore =
   Earley.token Lexer.IGNORE
+
+immediate :: Parser r Lexer.Token
+immediate =
+  Earley.token Lexer.IMMEDIATE
 
 key :: Parser r Lexer.Token
 key =
@@ -191,6 +207,10 @@ table =
 to :: Parser r Lexer.Token
 to =
   Earley.token Lexer.TO
+
+transaction :: Parser r Lexer.Token
+transaction =
+  Earley.token Lexer.TRANSACTION
 
 true :: Parser r Lexer.Token
 true =
