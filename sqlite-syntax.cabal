@@ -51,6 +51,7 @@ library
     Sqlite.Syntax.Parser
   hs-source-dirs: src
   other-modules:
+    Sqlite.Syntax.Parser.Token
     TextParser
 
 test-suite tests

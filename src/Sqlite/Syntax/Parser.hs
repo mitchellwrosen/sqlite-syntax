@@ -3,128 +3,9 @@ module Sqlite.Syntax.Parser where
 import Control.Applicative
 import Control.Applicative.Combinators (choice)
 import Data.Text (Text)
-import qualified Sqlite.Syntax.Lexer as Lexer
+import Sqlite.Syntax.Parser.Token
 import qualified Text.Earley as Earley
-import Prelude hiding (Ordering, not, null)
-
-type Parser r =
-  Earley.Prod r Text Lexer.Token
-
-add :: Parser r Lexer.Token
-add =
-  Earley.token Lexer.ADD
-
-alter :: Parser r Lexer.Token
-alter =
-  Earley.token Lexer.ALTER
-
-always :: Parser r Lexer.Token
-always =
-  Earley.token Lexer.ALWAYS
-
-analyze :: Parser r Lexer.Token
-analyze =
-  Earley.token Lexer.ANALYZE
-
-as :: Parser r Lexer.Token
-as =
-  Earley.token Lexer.AS
-
-asc :: Parser r Lexer.Token
-asc =
-  Earley.token Lexer.ASC
-
-autoincrement :: Parser r Lexer.Token
-autoincrement =
-  Earley.token Lexer.AUTOINCREMENT
-
-check :: Parser r Lexer.Token
-check =
-  Earley.token Lexer.CHECK
-
-collate :: Parser r Lexer.Token
-collate =
-  Earley.token Lexer.COLLATE
-
-column :: Parser r Lexer.Token
-column =
-  Earley.token Lexer.COLUMN
-
-constraint :: Parser r Lexer.Token
-constraint =
-  Earley.token Lexer.CONSTRAINT
-
-desc :: Parser r Lexer.Token
-desc =
-  Earley.token Lexer.DESC
-
-drop :: Parser r Lexer.Token
-drop =
-  Earley.token Lexer.DROP
-
-fullStop :: Parser r Lexer.Token
-fullStop =
-  Earley.token Lexer.FullStop
-
-generated :: Parser r Lexer.Token
-generated =
-  Earley.token Lexer.GENERATED
-
-identifier :: Parser r Text
-identifier =
-  Earley.terminal \case
-    Lexer.Identifier s -> Just s
-    _ -> Nothing
-
-key :: Parser r Lexer.Token
-key =
-  Earley.token Lexer.KEY
-
-leftParenthesis :: Parser r Lexer.Token
-leftParenthesis =
-  Earley.token Lexer.LeftParenthesis
-
-not :: Parser r Lexer.Token
-not =
-  Earley.token Lexer.NOT
-
-null :: Parser r Lexer.Token
-null =
-  Earley.token Lexer.NULL
-
-primary :: Parser r Lexer.Token
-primary =
-  Earley.token Lexer.PRIMARY
-
-rename :: Parser r Lexer.Token
-rename =
-  Earley.token Lexer.RENAME
-
-rightParenthesis :: Parser r Lexer.Token
-rightParenthesis =
-  Earley.token Lexer.RightParenthesis
-
-stored :: Parser r Lexer.Token
-stored =
-  Earley.token Lexer.STORED
-
-table :: Parser r Lexer.Token
-table =
-  Earley.token Lexer.TABLE
-
-to :: Parser r Lexer.Token
-to =
-  Earley.token Lexer.TO
-
-unique :: Parser r Lexer.Token
-unique =
-  Earley.token Lexer.UNIQUE
-
-virtual :: Parser r Lexer.Token
-virtual =
-  Earley.token Lexer.VIRTUAL
-
---
+import Prelude hiding (Ordering, fail, not, null)
 
 parens :: Parser r a -> Parser r a
 parens p =
@@ -193,9 +74,9 @@ data ColumnConstraintType
   | ColumnConstraintType'Default Default
   | ColumnConstraintType'ForeignKey ForeignKeyClause
   | ColumnConstraintType'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraintType'NotNull ConflictClause
-  | ColumnConstraintType'PrimaryKey (Maybe Ordering) ConflictClause Bool
-  | ColumnConstraintType'Unique ConflictClause
+  | ColumnConstraintType'NotNull (Maybe ConflictClause)
+  | ColumnConstraintType'PrimaryKey (Maybe Ordering) (Maybe ConflictClause) Bool
+  | ColumnConstraintType'Unique (Maybe ConflictClause)
 
 makeColumnConstraintType :: Parser r Expression -> Parser r ColumnConstraintType
 makeColumnConstraintType expression =
@@ -216,13 +97,13 @@ makeColumnConstraintType expression =
         <$> (optional (generated *> always) *> as *> parens expression)
         <*> optional generatedType,
       ColumnConstraintType'NotNull
-        <$> (not *> null *> conflictClause),
+        <$> (not *> null *> optional conflictClause),
       ColumnConstraintType'PrimaryKey
         <$> (primary *> key *> optional ordering)
-        <*> conflictClause
+        <*> optional conflictClause
         <*> (True <$ autoincrement <|> pure False),
       ColumnConstraintType'Unique
-        <$> (unique *> conflictClause)
+        <$> (unique *> optional conflictClause)
     ]
 
 -- | https://sqlite.org/syntax/column-def.html
@@ -252,9 +133,23 @@ columnName =
 
 -- | https://sqlite.org/syntax/conflict-clause.html
 data ConflictClause
+  = ConflictClause'Abort
+  | ConflictClause'Fail
+  | ConflictClause'Ignore
+  | ConflictClause'Replace
+  | ConflictClause'Rollback
 
 conflictClause :: Parser r ConflictClause
-conflictClause = undefined
+conflictClause =
+  on
+    *> conflict
+    *> choice
+      [ ConflictClause'Abort <$ abort,
+        ConflictClause'Fail <$ fail,
+        ConflictClause'Ignore <$ ignore,
+        ConflictClause'Replace <$ replace,
+        ConflictClause'Rollback <$ rollback
+      ]
 
 newtype ConstraintName
   = ConstraintName Text
@@ -297,9 +192,29 @@ indexOrTableName =
   IndexOrTableName <$> identifier
 
 data LiteralValue
+  = LiteralValue'BlobLiteral Text
+  | LiteralValue'CurrentDate
+  | LiteralValue'CurrentTime
+  | LiteralValue'CurrentTimestamp
+  | LiteralValue'False
+  | LiteralValue'Null
+  | LiteralValue'NumericLiteral Text
+  | LiteralValue'StringLiteral Text
+  | LiteralValue'True
 
 literalValue :: Parser r LiteralValue
-literalValue = undefined
+literalValue =
+  choice
+    [ LiteralValue'BlobLiteral <$> blob,
+      LiteralValue'CurrentDate <$ currentDate,
+      LiteralValue'CurrentTime <$ currentTime,
+      LiteralValue'CurrentTimestamp <$ currentTimestamp,
+      LiteralValue'False <$ false,
+      LiteralValue'Null <$ null,
+      LiteralValue'NumericLiteral <$> number,
+      LiteralValue'StringLiteral <$> string,
+      LiteralValue'True <$ true
+    ]
 
 data Ordering
   = Ordering'Asc
