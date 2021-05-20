@@ -18,6 +18,8 @@ data Syntax
   | Syntax'AnalyzeStatement AnalyzeStatement
   | Syntax'AttachStatement AttachStatement
   | Syntax'BeginStatement BeginStatement
+  | Syntax'CommitStatement
+  | Syntax'RollbackStatement RollbackStatement
 
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
@@ -34,7 +36,10 @@ syntax = mdo
       [ Syntax'AlterTableStatement <$> alterTableStatement,
         Syntax'AnalyzeStatement <$> analyzeStatement,
         Syntax'AttachStatement <$> attachStatement,
-        Syntax'BeginStatement <$> beginStatement
+        Syntax'BeginStatement <$> beginStatement,
+        -- https://sqlite.org/syntax/commit-stmt.html
+        Syntax'CommitStatement <$ (choice [commit, end] *> optional transaction),
+        Syntax'RollbackStatement <$> rollbackStatement
       ]
 
 --
@@ -256,6 +261,21 @@ ordering =
     [ Ordering'Asc <$ asc,
       Ordering'Desc <$ desc
     ]
+
+-- | https://sqlite.org/syntax/rollback-stmt.html
+newtype RollbackStatement
+  = RollbackStatement (Maybe SavepointName)
+
+rollbackStatement :: Parser r RollbackStatement
+rollbackStatement =
+  RollbackStatement
+    <$> (rollback *> optional transaction *> optional (to *> optional savepoint *> savepointName))
+
+newtype SavepointName
+  = SavepointName Text
+
+savepointName :: Parser r SavepointName
+savepointName = undefined
 
 newtype SchemaName
   = SchemaName Text

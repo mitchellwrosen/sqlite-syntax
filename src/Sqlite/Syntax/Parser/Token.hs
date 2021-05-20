@@ -66,6 +66,10 @@ column :: Parser r Lexer.Token
 column =
   Earley.token Lexer.COLUMN
 
+commit :: Parser r Lexer.Token
+commit =
+  Earley.token Lexer.COMMIT
+
 conflict :: Parser r Lexer.Token
 conflict =
   Earley.token Lexer.CONFLICT
@@ -101,6 +105,10 @@ desc =
 drop :: Parser r Lexer.Token
 drop =
   Earley.token Lexer.DROP
+
+end :: Parser r Lexer.Token
+end =
+  Earley.token Lexer.END
 
 exclusive :: Parser r Lexer.Token
 exclusive =
@@ -189,6 +197,10 @@ rightParenthesis =
 rollback :: Parser r Lexer.Token
 rollback =
   Earley.token Lexer.ROLLBACK
+
+savepoint :: Parser r Lexer.Token
+savepoint =
+  Earley.token Lexer.SAVEPOINT
 
 stored :: Parser r Lexer.Token
 stored =
