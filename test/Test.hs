@@ -8,7 +8,7 @@ import qualified Data.Text.Lazy.Builder as Text.Builder
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-import Lexer
+import Sqlite.Syntax.Lexer
 import Prelude hiding (lex)
 
 main :: IO Bool
