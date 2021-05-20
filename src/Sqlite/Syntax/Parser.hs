@@ -2,11 +2,15 @@ module Sqlite.Syntax.Parser where
 
 import Control.Applicative
 import Control.Applicative.Combinators (choice)
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Text (Text)
 import Sqlite.Syntax.Parser.Token
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
+
+commaSep1 :: Parser r a -> Parser r (NonEmpty a)
+commaSep1 p =
+  (:|) <$> p <*> many (comma *> p)
 
 parens :: Parser r a -> Parser r a
 parens p =
@@ -20,8 +24,7 @@ data Syntax
   | Syntax'AttachStatement AttachStatement
   | Syntax'BeginStatement BeginStatement
   | Syntax'CommitStatement
-  | Syntax'RollbackStatement RollbackStatement
-  | Syntax'CreateIndexStatement TODO
+  | Syntax'CreateIndexStatement CreateIndexStatement
   | Syntax'CreateTableStatement TODO
   | Syntax'CreateTriggerStatement TODO
   | Syntax'CreateViewStatement TODO
@@ -36,6 +39,7 @@ data Syntax
   | Syntax'PragmaStatement TODO
   | Syntax'ReindexStatement TODO
   | Syntax'ReleaseStatement TODO
+  | Syntax'RollbackStatement RollbackStatement
   | Syntax'SavepointStatement TODO
   | Syntax'SelectStatement TODO
   | Syntax'UpdateStatement TODO
@@ -52,6 +56,7 @@ syntax = mdo
       columnConstraint = makeColumnConstraint columnConstraintType
       columnConstraintType = makeColumnConstraintType expression
       columnDefinition = makeColumnDefinition columnConstraint
+      createIndexStatement = makeCreateIndexStatement expression
 
   pure do
     choice
@@ -61,6 +66,7 @@ syntax = mdo
         Syntax'BeginStatement <$> beginStatement,
         -- https://sqlite.org/syntax/commit-stmt.html
         Syntax'CommitStatement <$ (choice [commit, end] *> optional transaction),
+        Syntax'CreateIndexStatement <$> createIndexStatement,
         Syntax'RollbackStatement <$> rollbackStatement
       ]
 
@@ -221,6 +227,24 @@ constraintName :: Parser r ConstraintName
 constraintName =
   ConstraintName <$> identifier
 
+-- | https://sqlite.org/syntax/create-index-stmt.html
+data CreateIndexStatement
+  = CreateIndexStatement Bool Bool (SchemaQualified IndexName) TableName (NonEmpty IndexedColumn) (Maybe Expression)
+
+makeCreateIndexStatement :: Parser r Expression -> Parser r CreateIndexStatement
+makeCreateIndexStatement expression =
+  CreateIndexStatement
+    <$> (create *> perhaps unique)
+    <*> (index *> perhaps (if_ *> not *> exists))
+    <*> schemaQualified indexName
+    <*> (on *> tableName)
+    <*> parens (commaSep1 indexedColumn)
+    <*> optional (where_ *> expression)
+
+perhaps :: Parser r a -> Parser r Bool
+perhaps p =
+  choice [True <$ p, pure False]
+
 data Default
   = Default'Expression Expression
   | Default'LiteralValue LiteralValue
@@ -248,12 +272,23 @@ generatedType =
       GeneratedType'Virtual <$ virtual
     ]
 
+newtype IndexName
+  = IndexName Text
+
+indexName :: Parser r IndexName
+indexName = undefined
+
 newtype IndexOrTableName
   = IndexOrTableName Text
 
 indexOrTableName :: Parser r IndexOrTableName
 indexOrTableName =
   IndexOrTableName <$> identifier
+
+data IndexedColumn
+
+indexedColumn :: Parser r IndexedColumn
+indexedColumn = undefined
 
 data LiteralValue
   = LiteralValue'BlobLiteral Text

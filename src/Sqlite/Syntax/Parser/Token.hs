@@ -66,6 +66,10 @@ column :: Parser r Lexer.Token
 column =
   Earley.token Lexer.COLUMN
 
+comma :: Parser r Lexer.Token
+comma =
+  Earley.token Lexer.Comma
+
 commit :: Parser r Lexer.Token
 commit =
   Earley.token Lexer.COMMIT
@@ -77,6 +81,10 @@ conflict =
 constraint :: Parser r Lexer.Token
 constraint =
   Earley.token Lexer.CONSTRAINT
+
+create :: Parser r Lexer.Token
+create =
+  Earley.token Lexer.CREATE
 
 currentDate :: Parser r Lexer.Token
 currentDate =
@@ -114,6 +122,10 @@ exclusive :: Parser r Lexer.Token
 exclusive =
   Earley.token Lexer.EXCLUSIVE
 
+exists :: Parser r Lexer.Token
+exists =
+  Earley.token Lexer.EXISTS
+
 fail :: Parser r Lexer.Token
 fail =
   Earley.token Lexer.FAIL
@@ -140,6 +152,10 @@ identifier =
     Lexer.Identifier s -> Just s
     _ -> Nothing
 
+if_ :: Parser r Lexer.Token
+if_ =
+  Earley.token Lexer.IF
+
 ignore :: Parser r Lexer.Token
 ignore =
   Earley.token Lexer.IGNORE
@@ -147,6 +163,10 @@ ignore =
 immediate :: Parser r Lexer.Token
 immediate =
   Earley.token Lexer.IMMEDIATE
+
+index :: Parser r Lexer.Token
+index =
+  Earley.token Lexer.INDEX
 
 key :: Parser r Lexer.Token
 key =
@@ -235,3 +255,7 @@ unique =
 virtual :: Parser r Lexer.Token
 virtual =
   Earley.token Lexer.VIRTUAL
+
+where_ :: Parser r Lexer.Token
+where_ =
+  Earley.token Lexer.WHERE
