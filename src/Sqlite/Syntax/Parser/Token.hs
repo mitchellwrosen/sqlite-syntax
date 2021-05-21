@@ -16,6 +16,10 @@ add :: Parser r Lexer.Token
 add =
   Earley.token Lexer.ADD
 
+all :: Parser r Lexer.Token
+all =
+  Earley.token Lexer.ALL
+
 alter :: Parser r Lexer.Token
 alter =
   Earley.token Lexer.ALTER
@@ -53,6 +57,10 @@ blob =
   Earley.terminal \case
     Lexer.Blob s -> Just s
     _ -> Nothing
+
+by :: Parser r Lexer.Token
+by =
+  Earley.token Lexer.BY
 
 check :: Parser r Lexer.Token
 check =
@@ -110,6 +118,10 @@ desc :: Parser r Lexer.Token
 desc =
   Earley.token Lexer.DESC
 
+distinct :: Parser r Lexer.Token
+distinct =
+  Earley.token Lexer.DISTINCT
+
 drop :: Parser r Lexer.Token
 drop =
   Earley.token Lexer.DROP
@@ -117,6 +129,10 @@ drop =
 end :: Parser r Lexer.Token
 end =
   Earley.token Lexer.END
+
+except :: Parser r Lexer.Token
+except =
+  Earley.token Lexer.EXCEPT
 
 exclusive :: Parser r Lexer.Token
 exclusive =
@@ -146,6 +162,14 @@ generated :: Parser r Lexer.Token
 generated =
   Earley.token Lexer.GENERATED
 
+group :: Parser r Lexer.Token
+group =
+  Earley.token Lexer.GROUP
+
+having :: Parser r Lexer.Token
+having =
+  Earley.token Lexer.HAVING
+
 hyphenMinus :: Parser r Lexer.Token
 hyphenMinus =
   Earley.token Lexer.HyphenMinus
@@ -172,6 +196,10 @@ index :: Parser r Lexer.Token
 index =
   Earley.token Lexer.INDEX
 
+intersect :: Parser r Lexer.Token
+intersect =
+  Earley.token Lexer.INTERSECT
+
 key :: Parser r Lexer.Token
 key =
   Earley.token Lexer.KEY
@@ -179,6 +207,10 @@ key =
 leftParenthesis :: Parser r Lexer.Token
 leftParenthesis =
   Earley.token Lexer.LeftParenthesis
+
+limit :: Parser r Lexer.Token
+limit =
+  Earley.token Lexer.LIMIT
 
 not :: Parser r Lexer.Token
 not =
@@ -194,6 +226,10 @@ number =
     Lexer.Number s -> Just s
     _ -> Nothing
 
+offset :: Parser r Lexer.Token
+offset =
+  Earley.token Lexer.OFFSET
+
 on :: Parser r Lexer.Token
 on =
   Earley.token Lexer.ON
@@ -205,6 +241,10 @@ plusSign =
 primary :: Parser r Lexer.Token
 primary =
   Earley.token Lexer.PRIMARY
+
+recursive :: Parser r Lexer.Token
+recursive =
+  Earley.token Lexer.RECURSIVE
 
 rename :: Parser r Lexer.Token
 rename =
@@ -229,6 +269,10 @@ rowid =
 savepoint :: Parser r Lexer.Token
 savepoint =
   Earley.token Lexer.SAVEPOINT
+
+select :: Parser r Lexer.Token
+select =
+  Earley.token Lexer.SELECT
 
 stored :: Parser r Lexer.Token
 stored =
@@ -264,9 +308,17 @@ true :: Parser r Lexer.Token
 true =
   Earley.token Lexer.TRUE
 
+union :: Parser r Lexer.Token
+union =
+  Earley.token Lexer.UNION
+
 unique :: Parser r Lexer.Token
 unique =
   Earley.token Lexer.UNIQUE
+
+values :: Parser r Lexer.Token
+values =
+  Earley.token Lexer.VALUES
 
 virtual :: Parser r Lexer.Token
 virtual =
@@ -275,6 +327,10 @@ virtual =
 where_ :: Parser r Lexer.Token
 where_ =
   Earley.token Lexer.WHERE
+
+with :: Parser r Lexer.Token
+with =
+  Earley.token Lexer.WITH
 
 without :: Parser r Lexer.Token
 without =

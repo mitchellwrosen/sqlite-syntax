@@ -4,17 +4,22 @@ import Control.Applicative
 import Control.Applicative.Combinators (choice)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Text (Text)
-import Sqlite.Syntax.Parser.Token
+import qualified Sqlite.Syntax.Parser.Token as Token
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
 
+-- TODO simplify some things with defaults (e.g. missing distinct/all == all)
+
+type Parser r =
+  Token.Parser r
+
 commaSep1 :: Parser r a -> Parser r (NonEmpty a)
 commaSep1 p =
-  (:|) <$> p <*> many (comma *> p)
+  (:|) <$> p <*> many (Token.comma *> p)
 
 parens :: Parser r a -> Parser r a
 parens p =
-  leftParenthesis *> p <* rightParenthesis
+  Token.leftParenthesis *> p <* Token.rightParenthesis
 
 perhaps :: Parser r a -> Parser r Bool
 perhaps p =
@@ -72,7 +77,7 @@ syntax = mdo
         Syntax'AttachStatement <$> attachStatement,
         Syntax'BeginStatement <$> beginStatement,
         -- https://sqlite.org/syntax/commit-stmt.html
-        Syntax'CommitStatement <$ (choice [commit, end] *> optional transaction),
+        Syntax'CommitStatement <$ (choice [Token.commit, Token.end] *> optional Token.transaction),
         Syntax'CreateIndexStatement <$> createIndexStatement,
         Syntax'CreateTableStatement <$> createTableStatement,
         Syntax'RollbackStatement <$> rollbackStatement
@@ -87,17 +92,17 @@ data AlterTableStatement
 makeAlterTableStatement :: Parser r ColumnDefinition -> Parser r AlterTableStatement
 makeAlterTableStatement columnDefinition =
   AlterTableStatement
-    <$> (alter *> table *> schemaQualified tableName)
+    <$> (Token.alter *> Token.table *> schemaQualified tableName)
     <*> choice
       [ TableAlteration'AddColumn
           <$> columnDefinition,
         TableAlteration'DropColumn
           <$> columnName,
         TableAlteration'Rename
-          <$> (rename *> to *> tableName),
+          <$> (Token.rename *> Token.to *> tableName),
         TableAlteration'RenameColumn
-          <$> (rename *> optional column *> columnName)
-          <*> (to *> columnName)
+          <$> (Token.rename *> optional Token.column *> columnName)
+          <*> (Token.to *> columnName)
       ]
 
 -- | https://sqlite.org/lang_analyze.html
@@ -107,7 +112,7 @@ data AnalyzeStatement
 analyzeStatement :: Parser r AnalyzeStatement
 analyzeStatement =
   AnalyzeStatement
-    <$> (analyze *> optional (schemaQualified indexOrTableName))
+    <$> (Token.analyze *> optional (schemaQualified indexOrTableName))
 
 -- | https://sqlite.org/syntax/attach-stmt.html
 data AttachStatement
@@ -116,8 +121,8 @@ data AttachStatement
 makeAttachStatement :: Parser r Expression -> Parser r AttachStatement
 makeAttachStatement expression =
   AttachStatement
-    <$> (attach *> optional database *> expression)
-    <*> (as *> schemaName)
+    <$> (Token.attach *> optional Token.database *> expression)
+    <*> (Token.as *> schemaName)
 
 -- | https://sqlite.org/syntax/begin-stmt.html
 newtype BeginStatement
@@ -126,7 +131,7 @@ newtype BeginStatement
 beginStatement :: Parser r BeginStatement
 beginStatement =
   BeginStatement
-    <$> (begin *> optional transactionType <* optional transaction)
+    <$> (Token.begin *> optional transactionType <* optional Token.transaction)
 
 newtype ColumnAlias
   = ColumnAlias Text
@@ -142,7 +147,7 @@ data ColumnConstraint
 makeColumnConstraint :: Parser r ColumnConstraintType -> Parser r ColumnConstraint
 makeColumnConstraint columnConstraintType =
   ColumnConstraint
-    <$> optional (constraint *> constraintName)
+    <$> optional (Token.constraint *> constraintName)
     <*> columnConstraintType
 
 data ColumnConstraintType
@@ -159,9 +164,9 @@ makeColumnConstraintType :: Parser r Expression -> Parser r ColumnConstraintType
 makeColumnConstraintType expression =
   choice
     [ ColumnConstraintType'Check
-        <$> (check *> parens expression),
+        <$> (Token.check *> parens expression),
       ColumnConstraintType'Collate
-        <$> (collate *> collationName),
+        <$> (Token.collate *> collationName),
       ColumnConstraintType'Default
         <$> choice
           [ Default'Expression <$> parens expression,
@@ -171,16 +176,16 @@ makeColumnConstraintType expression =
       ColumnConstraintType'ForeignKey
         <$> foreignKeyClause,
       ColumnConstraintType'Generated
-        <$> (optional (generated *> always) *> as *> parens expression)
+        <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expression)
         <*> optional generatedType,
       ColumnConstraintType'NotNull
-        <$> (not *> null *> optional onConflictClause),
+        <$> (Token.not *> Token.null *> optional onConflictClause),
       ColumnConstraintType'PrimaryKey
-        <$> (primary *> key *> optional ordering)
+        <$> (Token.primary *> Token.key *> optional ordering)
         <*> optional onConflictClause
-        <*> perhaps autoincrement,
+        <*> perhaps Token.autoincrement,
       ColumnConstraintType'Unique
-        <$> (unique *> optional onConflictClause)
+        <$> (Token.unique *> optional onConflictClause)
     ]
 
 -- | https://sqlite.org/syntax/column-def.html
@@ -206,34 +211,34 @@ newtype ColumnName
 
 columnName :: Parser r ColumnName
 columnName =
-  ColumnName <$> identifier
+  ColumnName <$> Token.identifier
 
--- | https://sqlite.org/syntax/conflict-clause.html
-data OnConflictClause
-  = OnConflictClause'Abort
-  | OnConflictClause'Fail
-  | OnConflictClause'Ignore
-  | OnConflictClause'Replace
-  | OnConflictClause'Rollback
+data CommonTableExpression
 
-onConflictClause :: Parser r OnConflictClause
-onConflictClause =
-  on
-    *> conflict
-    *> choice
-      [ OnConflictClause'Abort <$ abort,
-        OnConflictClause'Fail <$ fail,
-        OnConflictClause'Ignore <$ ignore,
-        OnConflictClause'Replace <$ replace,
-        OnConflictClause'Rollback <$ rollback
-      ]
+commonTableExpression :: Parser r CommonTableExpression
+commonTableExpression = undefined
+
+data CompoundOperator
+  = CompoundOperator'Except
+  | CompoundOperator'Intersect
+  | CompoundOperator'Union
+  | CompoundOperator'UnionAll
+
+compoundOperator :: Parser r CompoundOperator
+compoundOperator =
+  choice
+    [ CompoundOperator'Except <$ Token.except,
+      CompoundOperator'Intersect <$ Token.intersect,
+      CompoundOperator'Union <$ Token.union,
+      CompoundOperator'UnionAll <$ (Token.union *> Token.all)
+    ]
 
 newtype ConstraintName
   = ConstraintName Text
 
 constraintName :: Parser r ConstraintName
 constraintName =
-  ConstraintName <$> identifier
+  ConstraintName <$> Token.identifier
 
 -- | https://sqlite.org/syntax/create-index-stmt.html
 data CreateIndexStatement
@@ -242,12 +247,12 @@ data CreateIndexStatement
 makeCreateIndexStatement :: Parser r Expression -> Parser r IndexedColumn -> Parser r CreateIndexStatement
 makeCreateIndexStatement expression indexedColumn =
   CreateIndexStatement
-    <$> (create *> perhaps unique)
-    <*> (index *> perhaps (if_ *> not *> exists))
+    <$> (Token.create *> perhaps Token.unique)
+    <*> (Token.index *> perhaps (Token.if_ *> Token.not *> Token.exists))
     <*> schemaQualified indexName
-    <*> (on *> tableName)
+    <*> (Token.on *> tableName)
     <*> parens (commaSep1 indexedColumn)
-    <*> optional (where_ *> expression)
+    <*> optional (Token.where_ *> expression)
 
 -- | https://sqlite.org/syntax/create-table-stmt.html
 data CreateTableStatement
@@ -261,11 +266,11 @@ makeCreateTableStatement ::
   Parser r CreateTableStatement
 makeCreateTableStatement columnDefinition expression indexedColumn selectStatement =
   CreateTableStatement
-    <$> (create *> perhaps (choice [temp, temporary]))
-    <*> (table *> perhaps (if_ *> not *> exists))
+    <$> (Token.create *> perhaps (choice [Token.temp, Token.temporary]))
+    <*> (Token.table *> perhaps (Token.if_ *> Token.not *> Token.exists))
     <*> schemaQualified tableName
     <*> choice
-      [ Left <$> (as *> selectStatement),
+      [ Left <$> (Token.as *> selectStatement),
         Right <$> tableDefinition
       ]
   where
@@ -288,6 +293,12 @@ data ForeignKeyClause
 foreignKeyClause :: Parser r ForeignKeyClause
 foreignKeyClause = undefined
 
+newtype FromClause
+  = FromClause (Either (NonEmpty TableOrSubquery) JoinClause)
+
+fromClause :: Parser r FromClause
+fromClause = undefined
+
 data GeneratedType
   = GeneratedType'Stored
   | GeneratedType'Virtual
@@ -295,9 +306,31 @@ data GeneratedType
 generatedType :: Parser r GeneratedType
 generatedType =
   choice
-    [ GeneratedType'Stored <$ stored,
-      GeneratedType'Virtual <$ virtual
+    [ GeneratedType'Stored <$ Token.stored,
+      GeneratedType'Virtual <$ Token.virtual
     ]
+
+data GroupByClause = GroupByClause
+  { groupBy :: NonEmpty Expression,
+    having :: Maybe HavingClause
+  }
+
+makeGroupByClause :: Parser r Expression -> Parser r GroupByClause
+makeGroupByClause expression =
+  GroupByClause
+    <$> (Token.group *> Token.by *> commaSep1 expression)
+    <*> optional havingClause
+  where
+    havingClause =
+      makeHavingClause expression
+
+newtype HavingClause
+  = HavingClause Expression
+
+makeHavingClause :: Parser r Expression -> Parser r HavingClause
+makeHavingClause expression =
+  HavingClause
+    <$> (Token.having *> expression)
 
 newtype IndexName
   = IndexName Text
@@ -310,11 +343,13 @@ newtype IndexOrTableName
 
 indexOrTableName :: Parser r IndexOrTableName
 indexOrTableName =
-  IndexOrTableName <$> identifier
+  IndexOrTableName <$> Token.identifier
 
 -- | https://sqlite.org/syntax/indexed-column.html
 data IndexedColumn
   = IndexedColumn (Either ColumnName Expression) (Maybe CollationName) (Maybe Ordering)
+
+data JoinClause
 
 makeIndexedColumn :: Parser r Expression -> Parser r IndexedColumn
 makeIndexedColumn expression =
@@ -323,8 +358,28 @@ makeIndexedColumn expression =
       [ Left <$> columnName,
         Right <$> expression
       ]
-    <*> optional (collate *> collationName)
+    <*> optional (Token.collate *> collationName)
     <*> optional ordering
+
+data LimitClause
+  = LimitClause Expression (Maybe OffsetClause)
+
+makeLimitClause :: Parser r Expression -> Parser r LimitClause
+makeLimitClause expression =
+  munge
+    <$> (Token.limit *> expression)
+    <*> optional
+      ( choice
+          [ Left <$> (Token.offset *> expression),
+            Right <$> (Token.comma *> expression)
+          ]
+      )
+  where
+    munge :: Expression -> Maybe (Either Expression Expression) -> LimitClause
+    munge e1 = \case
+      Nothing -> LimitClause e1 Nothing -- LIMIT x
+      Just (Left e2) -> LimitClause e1 (Just (OffsetClause e2)) -- LIMIT x OFFSET y
+      Just (Right e2) -> LimitClause e2 (Just (OffsetClause e1)) -- LIMIT y, x
 
 data LiteralValue
   = LiteralValue'BlobLiteral Text
@@ -340,16 +395,45 @@ data LiteralValue
 literalValue :: Parser r LiteralValue
 literalValue =
   choice
-    [ LiteralValue'BlobLiteral <$> blob,
-      LiteralValue'CurrentDate <$ currentDate,
-      LiteralValue'CurrentTime <$ currentTime,
-      LiteralValue'CurrentTimestamp <$ currentTimestamp,
-      LiteralValue'False <$ false,
-      LiteralValue'Null <$ null,
-      LiteralValue'NumericLiteral <$> number,
-      LiteralValue'StringLiteral <$> string,
-      LiteralValue'True <$ true
+    [ LiteralValue'BlobLiteral <$> Token.blob,
+      LiteralValue'CurrentDate <$ Token.currentDate,
+      LiteralValue'CurrentTime <$ Token.currentTime,
+      LiteralValue'CurrentTimestamp <$ Token.currentTimestamp,
+      LiteralValue'False <$ Token.false,
+      LiteralValue'Null <$ Token.null,
+      LiteralValue'NumericLiteral <$> Token.number,
+      LiteralValue'StringLiteral <$> Token.string,
+      LiteralValue'True <$ Token.true
     ]
+
+newtype OffsetClause
+  = OffsetClause Expression
+
+-- | https://sqlite.org/syntax/conflict-clause.html
+data OnConflictClause
+  = OnConflictClause'Abort
+  | OnConflictClause'Fail
+  | OnConflictClause'Ignore
+  | OnConflictClause'Replace
+  | OnConflictClause'Rollback
+
+onConflictClause :: Parser r OnConflictClause
+onConflictClause =
+  Token.on
+    *> Token.conflict
+    *> choice
+      [ OnConflictClause'Abort <$ Token.abort,
+        OnConflictClause'Fail <$ Token.fail,
+        OnConflictClause'Ignore <$ Token.ignore,
+        OnConflictClause'Replace <$ Token.replace,
+        OnConflictClause'Rollback <$ Token.rollback
+      ]
+
+newtype OrderByClause
+  = OrderByClause (NonEmpty OrderingTerm)
+
+orderByClause :: Parser r OrderByClause
+orderByClause = undefined
 
 data Ordering
   = Ordering'Asc
@@ -358,9 +442,11 @@ data Ordering
 ordering :: Parser r Ordering
 ordering =
   choice
-    [ Ordering'Asc <$ asc,
-      Ordering'Desc <$ desc
+    [ Ordering'Asc <$ Token.asc,
+      Ordering'Desc <$ Token.desc
     ]
+
+data OrderingTerm
 
 -- | https://sqlite.org/syntax/qualified-table-name.html
 data QualifiedTableName
@@ -379,6 +465,11 @@ data ReturningClauseItem
 makeReturningClauseItem :: Parser r Expression -> Parser r ReturningClauseItem
 makeReturningClauseItem = undefined
 
+data ResultColumn
+
+resultColumn :: Parser r ResultColumn
+resultColumn = undefined
+
 -- | https://sqlite.org/syntax/rollback-stmt.html
 newtype RollbackStatement
   = RollbackStatement (Maybe SavepointName)
@@ -386,7 +477,10 @@ newtype RollbackStatement
 rollbackStatement :: Parser r RollbackStatement
 rollbackStatement =
   RollbackStatement
-    <$> (rollback *> optional transaction *> optional (to *> optional savepoint *> savepointName))
+    <$> ( Token.rollback
+            *> optional Token.transaction
+            *> optional (Token.to *> optional Token.savepoint *> savepointName)
+        )
 
 newtype SavepointName
   = SavepointName Text
@@ -399,7 +493,7 @@ newtype SchemaName
 
 schemaName :: Parser r SchemaName
 schemaName =
-  SchemaName <$> identifier
+  SchemaName <$> Token.identifier
 
 data SchemaQualified a
   = SchemaQualified (Maybe SchemaName) a
@@ -407,10 +501,76 @@ data SchemaQualified a
 schemaQualified :: Parser r a -> Parser r (SchemaQualified a)
 schemaQualified p =
   SchemaQualified
-    <$> (optional schemaName <* fullStop)
+    <$> (optional schemaName <* Token.fullStop)
     <*> p
 
-data SelectStatement
+data Select = Select
+  { distinct :: Bool,
+    columns :: NonEmpty ResultColumn,
+    from :: Maybe FromClause,
+    where_ :: Maybe WhereClause,
+    groupBy :: Maybe GroupByClause,
+    window :: Maybe WindowClause
+  }
+
+makeSelect :: Parser r Expression -> Parser r Select
+makeSelect expression =
+  Select
+    <$> ( Token.select
+            *> choice
+              [ True <$ Token.distinct,
+                False <$ Token.all,
+                pure False
+              ]
+        )
+    <*> commaSep1 resultColumn
+    <*> optional fromClause
+    <*> optional whereClause
+    <*> optional groupByClause
+    <*> optional windowClause
+  where
+    groupByClause =
+      makeGroupByClause expression
+
+    whereClause =
+      makeWhereClause expression
+
+-- | https://sqlite.org/syntax/select-core.html
+data SelectCore
+  = SelectCore'Select Select
+  | SelectCore'Values (NonEmpty (NonEmpty Expression))
+
+makeSelectCore :: Parser r Expression -> Parser r SelectCore
+makeSelectCore expression =
+  choice
+    [ SelectCore'Select <$> select,
+      SelectCore'Values <$> (Token.values *> commaSep1 (parens (commaSep1 expression)))
+    ]
+  where
+    select =
+      makeSelect expression
+
+-- | https://sqlite.org/syntax/select-stmt.html
+data SelectStatement = SelectStatement
+  { with :: WithClause,
+    select :: (SelectCore, [(CompoundOperator, SelectCore)]),
+    orderBy :: Maybe OrderByClause,
+    limit :: Maybe LimitClause
+  }
+
+makeSelectStatement :: Parser r Expression -> Parser r SelectStatement
+makeSelectStatement expression =
+  SelectStatement
+    <$> withClause
+    <*> ((,) <$> selectCore <*> many ((,) <$> compoundOperator <*> selectCore))
+    <*> optional orderByClause
+    <*> optional limitClause
+  where
+    limitClause =
+      makeLimitClause expression
+
+    selectCore =
+      makeSelectCore expression
 
 data Sign
   = Sign'HyphenMinus
@@ -419,8 +579,8 @@ data Sign
 sign :: Parser r Sign
 sign =
   choice
-    [ Sign'HyphenMinus <$ hyphenMinus,
-      Sign'PlusSign <$ plusSign
+    [ Sign'HyphenMinus <$ Token.hyphenMinus,
+      Sign'PlusSign <$ Token.plusSign
     ]
 
 -- | https://sqlite.org/syntax/signed-number.html
@@ -431,7 +591,7 @@ signedNumber :: Parser r SignedNumber
 signedNumber =
   SignedNumber
     <$> optional sign
-    <*> number
+    <*> Token.number
 
 data TableAlteration
   = TableAlteration'AddColumn ColumnDefinition
@@ -446,7 +606,7 @@ data TableConstraint
 makeTableConstraint :: Parser r Expression -> Parser r IndexedColumn -> Parser r TableConstraint
 makeTableConstraint expression indexedColumn =
   TableConstraint
-    <$> optional (constraint *> constraintName)
+    <$> optional (Token.constraint *> constraintName)
     <*> makeTableConstraintType expression indexedColumn
 
 data TableConstraintType
@@ -459,15 +619,15 @@ makeTableConstraintType :: Parser r Expression -> Parser r IndexedColumn -> Pars
 makeTableConstraintType expression indexedColumn =
   choice
     [ TableConstraintType'Check
-        <$> (check *> parens expression),
+        <$> (Token.check *> parens expression),
       TableConstraintType'ForeignKey
-        <$> (foreign_ *> key *> parens (commaSep1 columnName))
+        <$> (Token.foreign_ *> Token.key *> parens (commaSep1 columnName))
         <*> foreignKeyClause,
       TableConstraintType'PrimaryKey
-        <$> (primary *> key *> parens (commaSep1 indexedColumn))
+        <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumn))
         <*> optional onConflictClause,
       TableConstraintType'Unique
-        <$> (unique *> parens (commaSep1 indexedColumn))
+        <$> (Token.unique *> parens (commaSep1 indexedColumn))
         <*> optional onConflictClause
     ]
 
@@ -481,9 +641,9 @@ makeTableDefinition ::
   Parser r TableDefinition
 makeTableDefinition columnDefinition expression indexedColumn =
   TableDefinition
-    <$> (leftParenthesis *> commaSep1 columnDefinition)
-    <*> (many (comma *> tableConstraint) <* rightParenthesis)
-    <*> perhaps (without *> rowid)
+    <$> (Token.leftParenthesis *> commaSep1 columnDefinition)
+    <*> (many (Token.comma *> tableConstraint) <* Token.rightParenthesis)
+    <*> perhaps (Token.without *> Token.rowid)
   where
     tableConstraint =
       makeTableConstraint expression indexedColumn
@@ -493,7 +653,9 @@ newtype TableName
 
 tableName :: Parser r TableName
 tableName =
-  TableName <$> identifier
+  TableName <$> Token.identifier
+
+data TableOrSubquery
 
 data TransactionType
   = TransactionType'Deferred
@@ -503,9 +665,9 @@ data TransactionType
 transactionType :: Parser r TransactionType
 transactionType =
   choice
-    [ TransactionType'Deferred <$ deferred,
-      TransactionType'Exclusive <$ exclusive,
-      TransactionType'Immediate <$ immediate
+    [ TransactionType'Deferred <$ Token.deferred,
+      TransactionType'Exclusive <$ Token.exclusive,
+      TransactionType'Immediate <$ Token.immediate
     ]
 
 newtype TypeName
@@ -513,4 +675,33 @@ newtype TypeName
 
 typeName :: Parser r TypeName
 typeName =
-  TypeName <$> identifier
+  TypeName <$> Token.identifier
+
+newtype WhereClause
+  = WhereClause Expression
+
+makeWhereClause :: Parser r Expression -> Parser r WhereClause
+makeWhereClause expression =
+  WhereClause
+    <$> (Token.where_ *> expression)
+
+newtype WindowClause
+  = WindowClause (NonEmpty (WindowName, WindowDefinition))
+
+windowClause :: Parser r WindowClause
+windowClause = undefined
+
+data WindowDefinition
+
+data WindowName
+
+data WithClause = WithClause
+  { recursive :: Bool,
+    commonTableExpressions :: NonEmpty CommonTableExpression
+  }
+
+withClause :: Parser r WithClause
+withClause =
+  WithClause
+    <$> (Token.with *> perhaps Token.recursive)
+    <*> commaSep1 commonTableExpression
