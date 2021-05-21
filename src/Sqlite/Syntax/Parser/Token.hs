@@ -134,6 +134,10 @@ false :: Parser r Lexer.Token
 false =
   Earley.token Lexer.FALSE
 
+foreign_ :: Parser r Lexer.Token
+foreign_ =
+  Earley.token Lexer.FOREIGN
+
 fullStop :: Parser r Lexer.Token
 fullStop =
   Earley.token Lexer.FullStop
@@ -218,6 +222,10 @@ rollback :: Parser r Lexer.Token
 rollback =
   Earley.token Lexer.ROLLBACK
 
+rowid :: Parser r Lexer.Token
+rowid =
+  Earley.token Lexer.ROWID
+
 savepoint :: Parser r Lexer.Token
 savepoint =
   Earley.token Lexer.SAVEPOINT
@@ -240,6 +248,14 @@ to :: Parser r Lexer.Token
 to =
   Earley.token Lexer.TO
 
+temp :: Parser r Lexer.Token
+temp =
+  Earley.token Lexer.TEMP
+
+temporary :: Parser r Lexer.Token
+temporary =
+  Earley.token Lexer.TEMPORARY
+
 transaction :: Parser r Lexer.Token
 transaction =
   Earley.token Lexer.TRANSACTION
@@ -259,3 +275,7 @@ virtual =
 where_ :: Parser r Lexer.Token
 where_ =
   Earley.token Lexer.WHERE
+
+without :: Parser r Lexer.Token
+without =
+  Earley.token Lexer.WITHOUT

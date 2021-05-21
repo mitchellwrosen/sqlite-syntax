@@ -29,7 +29,7 @@ data Syntax
   | Syntax'BeginStatement BeginStatement
   | Syntax'CommitStatement
   | Syntax'CreateIndexStatement CreateIndexStatement
-  | Syntax'CreateTableStatement TODO
+  | Syntax'CreateTableStatement CreateTableStatement
   | Syntax'CreateTriggerStatement TODO
   | Syntax'CreateViewStatement TODO
   | Syntax'CreateVirtualTableStatement TODO
@@ -53,15 +53,17 @@ data TODO
 
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
+  columnDefinition <- Earley.rule (makeColumnDefinition columnConstraint)
   expression <- Earley.rule (makeExpression expression)
   indexedColumn <- Earley.rule (makeIndexedColumn expression)
+  selectStatement <- undefined
 
   let alterTableStatement = makeAlterTableStatement columnDefinition
       attachStatement = makeAttachStatement expression
       columnConstraint = makeColumnConstraint columnConstraintType
       columnConstraintType = makeColumnConstraintType expression
-      columnDefinition = makeColumnDefinition columnConstraint
       createIndexStatement = makeCreateIndexStatement expression indexedColumn
+      createTableStatement = makeCreateTableStatement columnDefinition expression indexedColumn selectStatement
 
   pure do
     choice
@@ -72,6 +74,7 @@ syntax = mdo
         -- https://sqlite.org/syntax/commit-stmt.html
         Syntax'CommitStatement <$ (choice [commit, end] *> optional transaction),
         Syntax'CreateIndexStatement <$> createIndexStatement,
+        Syntax'CreateTableStatement <$> createTableStatement,
         Syntax'RollbackStatement <$> rollbackStatement
       ]
 
@@ -246,6 +249,29 @@ makeCreateIndexStatement expression indexedColumn =
     <*> parens (commaSep1 indexedColumn)
     <*> optional (where_ *> expression)
 
+-- | https://sqlite.org/syntax/create-table-stmt.html
+data CreateTableStatement
+  = CreateTableStatement Bool Bool (SchemaQualified TableName) (Either SelectStatement TableDefinition)
+
+makeCreateTableStatement ::
+  Parser r ColumnDefinition ->
+  Parser r Expression ->
+  Parser r IndexedColumn ->
+  Parser r SelectStatement ->
+  Parser r CreateTableStatement
+makeCreateTableStatement columnDefinition expression indexedColumn selectStatement =
+  CreateTableStatement
+    <$> (create *> perhaps (choice [temp, temporary]))
+    <*> (table *> perhaps (if_ *> not *> exists))
+    <*> schemaQualified tableName
+    <*> choice
+      [ Left <$> (as *> selectStatement),
+        Right <$> tableDefinition
+      ]
+  where
+    tableDefinition =
+      makeTableDefinition columnDefinition expression indexedColumn
+
 data Default
   = Default'Expression Expression
   | Default'LiteralValue LiteralValue
@@ -384,6 +410,8 @@ schemaQualified p =
     <$> (optional schemaName <* fullStop)
     <*> p
 
+data SelectStatement
+
 data Sign
   = Sign'HyphenMinus
   | Sign'PlusSign
@@ -410,6 +438,55 @@ data TableAlteration
   | TableAlteration'DropColumn ColumnName
   | TableAlteration'Rename TableName
   | TableAlteration'RenameColumn ColumnName ColumnName
+
+-- | https://sqlite.org/syntax/table-constraint.html
+data TableConstraint
+  = TableConstraint (Maybe ConstraintName) TableConstraintType
+
+makeTableConstraint :: Parser r Expression -> Parser r IndexedColumn -> Parser r TableConstraint
+makeTableConstraint expression indexedColumn =
+  TableConstraint
+    <$> optional (constraint *> constraintName)
+    <*> makeTableConstraintType expression indexedColumn
+
+data TableConstraintType
+  = TableConstraintType'Check Expression
+  | TableConstraintType'ForeignKey (NonEmpty ColumnName) ForeignKeyClause
+  | TableConstraintType'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflictClause)
+  | TableConstraintType'Unique (NonEmpty IndexedColumn) (Maybe OnConflictClause)
+
+makeTableConstraintType :: Parser r Expression -> Parser r IndexedColumn -> Parser r TableConstraintType
+makeTableConstraintType expression indexedColumn =
+  choice
+    [ TableConstraintType'Check
+        <$> (check *> parens expression),
+      TableConstraintType'ForeignKey
+        <$> (foreign_ *> key *> parens (commaSep1 columnName))
+        <*> foreignKeyClause,
+      TableConstraintType'PrimaryKey
+        <$> (primary *> key *> parens (commaSep1 indexedColumn))
+        <*> optional onConflictClause,
+      TableConstraintType'Unique
+        <$> (unique *> parens (commaSep1 indexedColumn))
+        <*> optional onConflictClause
+    ]
+
+data TableDefinition
+  = TableDefinition (NonEmpty ColumnDefinition) [TableConstraint] Bool
+
+makeTableDefinition ::
+  Parser r ColumnDefinition ->
+  Parser r Expression ->
+  Parser r IndexedColumn ->
+  Parser r TableDefinition
+makeTableDefinition columnDefinition expression indexedColumn =
+  TableDefinition
+    <$> (leftParenthesis *> commaSep1 columnDefinition)
+    <*> (many (comma *> tableConstraint) <* rightParenthesis)
+    <*> perhaps (without *> rowid)
+  where
+    tableConstraint =
+      makeTableConstraint expression indexedColumn
 
 newtype TableName
   = TableName Text
