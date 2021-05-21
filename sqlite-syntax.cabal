@@ -49,6 +49,7 @@ library
   exposed-modules:
     Sqlite.Syntax.Lexer
     Sqlite.Syntax.Parser
+    Sqlite.Syntax.Token
   hs-source-dirs: src
   other-modules:
     Sqlite.Syntax.Parser.Token

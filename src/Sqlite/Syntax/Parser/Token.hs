@@ -1,337 +1,337 @@
 module Sqlite.Syntax.Parser.Token where
 
 import Data.Text (Text)
-import qualified Sqlite.Syntax.Lexer as Lexer
+import Sqlite.Syntax.Token (Token (..))
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
 
 type Parser r =
-  Earley.Prod r Text Lexer.Token
+  Earley.Prod r Text Token
 
-abort :: Parser r Lexer.Token
+abort :: Parser r Token
 abort =
-  Earley.token Lexer.ABORT
+  Earley.token ABORT
 
-add :: Parser r Lexer.Token
+add :: Parser r Token
 add =
-  Earley.token Lexer.ADD
+  Earley.token ADD
 
-all :: Parser r Lexer.Token
+all :: Parser r Token
 all =
-  Earley.token Lexer.ALL
+  Earley.token ALL
 
-alter :: Parser r Lexer.Token
+alter :: Parser r Token
 alter =
-  Earley.token Lexer.ALTER
+  Earley.token ALTER
 
-always :: Parser r Lexer.Token
+always :: Parser r Token
 always =
-  Earley.token Lexer.ALWAYS
+  Earley.token ALWAYS
 
-analyze :: Parser r Lexer.Token
+analyze :: Parser r Token
 analyze =
-  Earley.token Lexer.ANALYZE
+  Earley.token ANALYZE
 
-as :: Parser r Lexer.Token
+as :: Parser r Token
 as =
-  Earley.token Lexer.AS
+  Earley.token AS
 
-asc :: Parser r Lexer.Token
+asc :: Parser r Token
 asc =
-  Earley.token Lexer.ASC
+  Earley.token ASC
 
-attach :: Parser r Lexer.Token
+attach :: Parser r Token
 attach =
-  Earley.token Lexer.ATTACH
+  Earley.token ATTACH
 
-autoincrement :: Parser r Lexer.Token
+autoincrement :: Parser r Token
 autoincrement =
-  Earley.token Lexer.AUTOINCREMENT
+  Earley.token AUTOINCREMENT
 
-begin :: Parser r Lexer.Token
+begin :: Parser r Token
 begin =
-  Earley.token Lexer.BEGIN
+  Earley.token BEGIN
 
 blob :: Parser r Text
 blob =
   Earley.terminal \case
-    Lexer.Blob s -> Just s
+    Blob s -> Just s
     _ -> Nothing
 
-by :: Parser r Lexer.Token
+by :: Parser r Token
 by =
-  Earley.token Lexer.BY
+  Earley.token BY
 
-check :: Parser r Lexer.Token
+check :: Parser r Token
 check =
-  Earley.token Lexer.CHECK
+  Earley.token CHECK
 
-collate :: Parser r Lexer.Token
+collate :: Parser r Token
 collate =
-  Earley.token Lexer.COLLATE
+  Earley.token COLLATE
 
-column :: Parser r Lexer.Token
+column :: Parser r Token
 column =
-  Earley.token Lexer.COLUMN
+  Earley.token COLUMN
 
-comma :: Parser r Lexer.Token
+comma :: Parser r Token
 comma =
-  Earley.token Lexer.Comma
+  Earley.token Comma
 
-commit :: Parser r Lexer.Token
+commit :: Parser r Token
 commit =
-  Earley.token Lexer.COMMIT
+  Earley.token COMMIT
 
-conflict :: Parser r Lexer.Token
+conflict :: Parser r Token
 conflict =
-  Earley.token Lexer.CONFLICT
+  Earley.token CONFLICT
 
-constraint :: Parser r Lexer.Token
+constraint :: Parser r Token
 constraint =
-  Earley.token Lexer.CONSTRAINT
+  Earley.token CONSTRAINT
 
-create :: Parser r Lexer.Token
+create :: Parser r Token
 create =
-  Earley.token Lexer.CREATE
+  Earley.token CREATE
 
-currentDate :: Parser r Lexer.Token
+currentDate :: Parser r Token
 currentDate =
-  Earley.token Lexer.CURRENT_DATE
+  Earley.token CURRENT_DATE
 
-currentTime :: Parser r Lexer.Token
+currentTime :: Parser r Token
 currentTime =
-  Earley.token Lexer.CURRENT_TIME
+  Earley.token CURRENT_TIME
 
-currentTimestamp :: Parser r Lexer.Token
+currentTimestamp :: Parser r Token
 currentTimestamp =
-  Earley.token Lexer.CURRENT_TIMESTAMP
+  Earley.token CURRENT_TIMESTAMP
 
-database :: Parser r Lexer.Token
+database :: Parser r Token
 database =
-  Earley.token Lexer.DATABASE
+  Earley.token DATABASE
 
-deferred :: Parser r Lexer.Token
+deferred :: Parser r Token
 deferred =
-  Earley.token Lexer.DEFERRED
+  Earley.token DEFERRED
 
-desc :: Parser r Lexer.Token
+desc :: Parser r Token
 desc =
-  Earley.token Lexer.DESC
+  Earley.token DESC
 
-distinct :: Parser r Lexer.Token
+distinct :: Parser r Token
 distinct =
-  Earley.token Lexer.DISTINCT
+  Earley.token DISTINCT
 
-drop :: Parser r Lexer.Token
+drop :: Parser r Token
 drop =
-  Earley.token Lexer.DROP
+  Earley.token DROP
 
-end :: Parser r Lexer.Token
+end :: Parser r Token
 end =
-  Earley.token Lexer.END
+  Earley.token END
 
-except :: Parser r Lexer.Token
+except :: Parser r Token
 except =
-  Earley.token Lexer.EXCEPT
+  Earley.token EXCEPT
 
-exclusive :: Parser r Lexer.Token
+exclusive :: Parser r Token
 exclusive =
-  Earley.token Lexer.EXCLUSIVE
+  Earley.token EXCLUSIVE
 
-exists :: Parser r Lexer.Token
+exists :: Parser r Token
 exists =
-  Earley.token Lexer.EXISTS
+  Earley.token EXISTS
 
-fail :: Parser r Lexer.Token
+fail :: Parser r Token
 fail =
-  Earley.token Lexer.FAIL
+  Earley.token FAIL
 
-false :: Parser r Lexer.Token
+false :: Parser r Token
 false =
-  Earley.token Lexer.FALSE
+  Earley.token FALSE
 
-foreign_ :: Parser r Lexer.Token
+foreign_ :: Parser r Token
 foreign_ =
-  Earley.token Lexer.FOREIGN
+  Earley.token FOREIGN
 
-fullStop :: Parser r Lexer.Token
+fullStop :: Parser r Token
 fullStop =
-  Earley.token Lexer.FullStop
+  Earley.token FullStop
 
-generated :: Parser r Lexer.Token
+generated :: Parser r Token
 generated =
-  Earley.token Lexer.GENERATED
+  Earley.token GENERATED
 
-group :: Parser r Lexer.Token
+group :: Parser r Token
 group =
-  Earley.token Lexer.GROUP
+  Earley.token GROUP
 
-having :: Parser r Lexer.Token
+having :: Parser r Token
 having =
-  Earley.token Lexer.HAVING
+  Earley.token HAVING
 
-hyphenMinus :: Parser r Lexer.Token
+hyphenMinus :: Parser r Token
 hyphenMinus =
-  Earley.token Lexer.HyphenMinus
+  Earley.token HyphenMinus
 
 identifier :: Parser r Text
 identifier =
   Earley.terminal \case
-    Lexer.Identifier s -> Just s
+    Identifier s -> Just s
     _ -> Nothing
 
-if_ :: Parser r Lexer.Token
+if_ :: Parser r Token
 if_ =
-  Earley.token Lexer.IF
+  Earley.token IF
 
-ignore :: Parser r Lexer.Token
+ignore :: Parser r Token
 ignore =
-  Earley.token Lexer.IGNORE
+  Earley.token IGNORE
 
-immediate :: Parser r Lexer.Token
+immediate :: Parser r Token
 immediate =
-  Earley.token Lexer.IMMEDIATE
+  Earley.token IMMEDIATE
 
-index :: Parser r Lexer.Token
+index :: Parser r Token
 index =
-  Earley.token Lexer.INDEX
+  Earley.token INDEX
 
-intersect :: Parser r Lexer.Token
+intersect :: Parser r Token
 intersect =
-  Earley.token Lexer.INTERSECT
+  Earley.token INTERSECT
 
-key :: Parser r Lexer.Token
+key :: Parser r Token
 key =
-  Earley.token Lexer.KEY
+  Earley.token KEY
 
-leftParenthesis :: Parser r Lexer.Token
+leftParenthesis :: Parser r Token
 leftParenthesis =
-  Earley.token Lexer.LeftParenthesis
+  Earley.token LeftParenthesis
 
-limit :: Parser r Lexer.Token
+limit :: Parser r Token
 limit =
-  Earley.token Lexer.LIMIT
+  Earley.token LIMIT
 
-not :: Parser r Lexer.Token
+not :: Parser r Token
 not =
-  Earley.token Lexer.NOT
+  Earley.token NOT
 
-null :: Parser r Lexer.Token
+null :: Parser r Token
 null =
-  Earley.token Lexer.NULL
+  Earley.token NULL
 
 number :: Parser r Text
 number =
   Earley.terminal \case
-    Lexer.Number s -> Just s
+    Number s -> Just s
     _ -> Nothing
 
-offset :: Parser r Lexer.Token
+offset :: Parser r Token
 offset =
-  Earley.token Lexer.OFFSET
+  Earley.token OFFSET
 
-on :: Parser r Lexer.Token
+on :: Parser r Token
 on =
-  Earley.token Lexer.ON
+  Earley.token ON
 
-plusSign :: Parser r Lexer.Token
+plusSign :: Parser r Token
 plusSign =
-  Earley.token Lexer.PlusSign
+  Earley.token PlusSign
 
-primary :: Parser r Lexer.Token
+primary :: Parser r Token
 primary =
-  Earley.token Lexer.PRIMARY
+  Earley.token PRIMARY
 
-recursive :: Parser r Lexer.Token
+recursive :: Parser r Token
 recursive =
-  Earley.token Lexer.RECURSIVE
+  Earley.token RECURSIVE
 
-rename :: Parser r Lexer.Token
+rename :: Parser r Token
 rename =
-  Earley.token Lexer.RENAME
+  Earley.token RENAME
 
-replace :: Parser r Lexer.Token
+replace :: Parser r Token
 replace =
-  Earley.token Lexer.REPLACE
+  Earley.token REPLACE
 
-rightParenthesis :: Parser r Lexer.Token
+rightParenthesis :: Parser r Token
 rightParenthesis =
-  Earley.token Lexer.RightParenthesis
+  Earley.token RightParenthesis
 
-rollback :: Parser r Lexer.Token
+rollback :: Parser r Token
 rollback =
-  Earley.token Lexer.ROLLBACK
+  Earley.token ROLLBACK
 
-rowid :: Parser r Lexer.Token
+rowid :: Parser r Token
 rowid =
-  Earley.token Lexer.ROWID
+  Earley.token ROWID
 
-savepoint :: Parser r Lexer.Token
+savepoint :: Parser r Token
 savepoint =
-  Earley.token Lexer.SAVEPOINT
+  Earley.token SAVEPOINT
 
-select :: Parser r Lexer.Token
+select :: Parser r Token
 select =
-  Earley.token Lexer.SELECT
+  Earley.token SELECT
 
-stored :: Parser r Lexer.Token
+stored :: Parser r Token
 stored =
-  Earley.token Lexer.STORED
+  Earley.token STORED
 
 string :: Parser r Text
 string =
   Earley.terminal \case
-    Lexer.String s -> Just s
+    String s -> Just s
     _ -> Nothing
 
-table :: Parser r Lexer.Token
+table :: Parser r Token
 table =
-  Earley.token Lexer.TABLE
+  Earley.token TABLE
 
-to :: Parser r Lexer.Token
+to :: Parser r Token
 to =
-  Earley.token Lexer.TO
+  Earley.token TO
 
-temp :: Parser r Lexer.Token
+temp :: Parser r Token
 temp =
-  Earley.token Lexer.TEMP
+  Earley.token TEMP
 
-temporary :: Parser r Lexer.Token
+temporary :: Parser r Token
 temporary =
-  Earley.token Lexer.TEMPORARY
+  Earley.token TEMPORARY
 
-transaction :: Parser r Lexer.Token
+transaction :: Parser r Token
 transaction =
-  Earley.token Lexer.TRANSACTION
+  Earley.token TRANSACTION
 
-true :: Parser r Lexer.Token
+true :: Parser r Token
 true =
-  Earley.token Lexer.TRUE
+  Earley.token TRUE
 
-union :: Parser r Lexer.Token
+union :: Parser r Token
 union =
-  Earley.token Lexer.UNION
+  Earley.token UNION
 
-unique :: Parser r Lexer.Token
+unique :: Parser r Token
 unique =
-  Earley.token Lexer.UNIQUE
+  Earley.token UNIQUE
 
-values :: Parser r Lexer.Token
+values :: Parser r Token
 values =
-  Earley.token Lexer.VALUES
+  Earley.token VALUES
 
-virtual :: Parser r Lexer.Token
+virtual :: Parser r Token
 virtual =
-  Earley.token Lexer.VIRTUAL
+  Earley.token VIRTUAL
 
-where_ :: Parser r Lexer.Token
+where_ :: Parser r Token
 where_ =
-  Earley.token Lexer.WHERE
+  Earley.token WHERE
 
-with :: Parser r Lexer.Token
+with :: Parser r Token
 with =
-  Earley.token Lexer.WITH
+  Earley.token WITH
 
-without :: Parser r Lexer.Token
+without :: Parser r Token
 without =
-  Earley.token Lexer.WITHOUT
+  Earley.token WITHOUT
