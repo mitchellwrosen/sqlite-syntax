@@ -41,41 +41,41 @@ perhaps p =
 
 --
 
-data Syntax
-  = Syntax'AlterTableStatement AlterTableStatement
-  | Syntax'AnalyzeStatement AnalyzeStatement
-  | Syntax'AttachStatement AttachStatement
-  | Syntax'BeginStatement BeginStatement
-  | Syntax'CommitStatement
-  | Syntax'CreateIndexStatement CreateIndexStatement
-  | Syntax'CreateTableStatement CreateTableStatement
-  | Syntax'CreateTriggerStatement TODO
-  | Syntax'CreateViewStatement TODO
-  | Syntax'CreateVirtualTableStatement TODO
-  | Syntax'DeleteStatement TODO
-  | Syntax'DetachStatement TODO
-  | Syntax'DropIndexStatement TODO
-  | Syntax'DropTableStatement TODO
-  | Syntax'DropTriggerStatement TODO
-  | Syntax'DropViewStatement TODO
-  | Syntax'InsertStatement TODO
-  | Syntax'PragmaStatement TODO
-  | Syntax'ReindexStatement TODO
-  | Syntax'ReleaseStatement TODO
-  | Syntax'RollbackStatement RollbackStatement
-  | Syntax'SavepointStatement TODO
-  | Syntax'SelectStatement TODO
-  | Syntax'UpdateStatement TODO
-  | Syntax'VacuumStatement TODO
+data Statement
+  = Statement'AlterTable AlterTableStatement
+  | Statement'Analyze AnalyzeStatement
+  | Statement'Attach AttachStatement
+  | Statement'Begin BeginStatement
+  | Statement'Commit
+  | Statement'CreateIndex CreateIndexStatement
+  | Statement'CreateTable CreateTableStatement
+  | Statement'CreateTrigger TODO
+  | Statement'CreateView TODO
+  | Statement'CreateVirtualTable TODO
+  | Statement'Delete TODO
+  | Statement'Detach TODO
+  | Statement'DropIndex TODO
+  | Statement'DropTable TODO
+  | Statement'DropTrigger TODO
+  | Statement'DropView TODO
+  | Statement'Insert TODO
+  | Statement'Pragma TODO
+  | Statement'Reindex TODO
+  | Statement'Release TODO
+  | Statement'Rollback RollbackStatement
+  | Statement'Savepoint TODO
+  | Statement'Select TODO
+  | Statement'Update TODO
+  | Statement'Vacuum TODO
 
 data TODO
 
-syntax :: Earley.Grammar r (Parser r Syntax)
-syntax = mdo
+statement :: Earley.Grammar r (Parser r Statement)
+statement = mdo
   columnDefinition <- Earley.rule (makeColumnDefinition columnConstraint)
   expression <- makeExpression selectStatement
   indexedColumn <- Earley.rule (makeIndexedColumn expression)
-  selectStatement <- undefined
+  selectStatement <- Earley.rule (makeSelectStatement expression)
 
   let alterTableStatement = makeAlterTableStatement columnDefinition
       attachStatement = makeAttachStatement expression
@@ -86,15 +86,14 @@ syntax = mdo
 
   pure do
     choice
-      [ Syntax'AlterTableStatement <$> alterTableStatement,
-        Syntax'AnalyzeStatement <$> analyzeStatement,
-        Syntax'AttachStatement <$> attachStatement,
-        Syntax'BeginStatement <$> beginStatement,
-        -- https://sqlite.org/syntax/commit-stmt.html
-        Syntax'CommitStatement <$ (choice [Token.commit, Token.end] *> optional Token.transaction),
-        Syntax'CreateIndexStatement <$> createIndexStatement,
-        Syntax'CreateTableStatement <$> createTableStatement,
-        Syntax'RollbackStatement <$> rollbackStatement
+      [ Statement'AlterTable <$> alterTableStatement,
+        Statement'Analyze <$> analyzeStatement,
+        Statement'Attach <$> attachStatement,
+        Statement'Begin <$> beginStatement,
+        Statement'Commit <$ commitStatement,
+        Statement'CreateIndex <$> createIndexStatement,
+        Statement'CreateTable <$> createTableStatement,
+        Statement'Rollback <$> rollbackStatement
       ]
 
 --
@@ -231,6 +230,11 @@ newtype ColumnName
 columnName :: Parser r ColumnName
 columnName =
   ColumnName <$> Token.identifier
+
+-- https://sqlite.org/syntax/commit-stmt.html
+commitStatement :: Parser r (Maybe Token)
+commitStatement =
+  choice [Token.commit, Token.end] *> optional Token.transaction
 
 data CommonTableExpression
 
