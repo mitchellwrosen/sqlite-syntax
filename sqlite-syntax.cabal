@@ -62,4 +62,6 @@ test-suite tests
     sqlite-syntax,
   hs-source-dirs: test
   main-is: Test.hs
+  other-modules:
+    LexerTests
   type: exitcode-stdio-1.0
