@@ -1,17 +1,31 @@
 module Sqlite.Syntax.Parser where
 
-import Control.Applicative
+import Control.Applicative hiding (some)
 import Control.Applicative.Combinators (choice)
+import Control.Applicative.Combinators.NonEmpty (some)
 import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Sqlite.Syntax.Parser.Token as Token
+import Sqlite.Syntax.Token (Token)
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
 
 -- TODO simplify some things with defaults (e.g. missing distinct/all == all)
+-- TODO derive show/eq/generic
+-- TODO flatten some things? e.g. UnaryOperator -> flatten into multiple Expression
+-- TODO move signed-number to lexer probably
+-- TODO FunctionName, etc. -> Identifier
 
 type Parser r =
   Token.Parser r
+
+commaSep0 :: Parser r a -> Parser r [a]
+commaSep0 p =
+  choice
+    [ NonEmpty.toList <$> commaSep1 p,
+      pure []
+    ]
 
 commaSep1 :: Parser r a -> Parser r (NonEmpty a)
 commaSep1 p =
@@ -59,7 +73,7 @@ data TODO
 syntax :: Earley.Grammar r (Parser r Syntax)
 syntax = mdo
   columnDefinition <- Earley.rule (makeColumnDefinition columnConstraint)
-  expression <- Earley.rule (makeExpression expression)
+  expression <- makeExpression selectStatement
   indexedColumn <- Earley.rule (makeIndexedColumn expression)
   selectStatement <- undefined
 
@@ -132,6 +146,11 @@ beginStatement :: Parser r BeginStatement
 beginStatement =
   BeginStatement
     <$> (Token.begin *> optional transactionType <* optional Token.transaction)
+
+data BindParameter
+
+bindParameter :: Parser r BindParameter
+bindParameter = undefined
 
 newtype ColumnAlias
   = ColumnAlias Text
@@ -283,9 +302,243 @@ data Default
   | Default'SignedNumber SignedNumber
 
 data Expression
+  = Expression'AggregateFunctionCall Text (Maybe FunctionArguments) (Maybe FilterClause)
+  | Expression'And Expression Expression
+  | Expression'Between Expression Expression Expression
+  | Expression'BindParameter BindParameter
+  | Expression'BitwiseAnd Expression Expression
+  | Expression'BitwiseNegate Expression
+  | Expression'BitwiseOr Expression Expression
+  | Expression'Case (Maybe Expression) (NonEmpty (Expression, Expression)) (Maybe Expression)
+  | Expression'Cast Expression TypeName
+  | Expression'Collate Expression CollationName
+  | Expression'Column (SchemaQualified (TableQualified ColumnName))
+  | Expression'Concatenate Expression Expression
+  | Expression'Divide Expression Expression
+  | Expression'Equals Expression Expression
+  | Expression'Exists SelectStatement
+  | Expression'FunctionCall Text (Maybe FunctionArguments)
+  | Expression'Glob Expression Expression (Maybe Expression)
+  | Expression'GreaterThan Expression Expression
+  | Expression'GreaterThanOrEquals Expression Expression
+  | Expression'InFunction Expression (SchemaQualified FunctionName) [Expression]
+  | Expression'InSubquery Expression SelectStatement
+  | Expression'InTable Expression (SchemaQualified TableName)
+  | Expression'InValues Expression [Expression]
+  | Expression'Is Expression Expression
+  | Expression'IsNot Expression Expression
+  | Expression'LessThan Expression Expression
+  | Expression'LessThanOrEquals Expression Expression
+  | Expression'Like Expression Expression (Maybe Expression)
+  | Expression'LiteralValue LiteralValue
+  | Expression'Match Expression Expression (Maybe Expression)
+  | Expression'Minus Expression Expression
+  | Expression'Modulo Expression Expression
+  | Expression'Multiply Expression Expression
+  | Expression'Negate Expression
+  | Expression'Not Expression
+  | Expression'NotBetween Expression Expression Expression
+  | Expression'NotEquals Expression Expression
+  | Expression'NotGlob Expression Expression (Maybe Expression)
+  | Expression'NotInFunction Expression (SchemaQualified FunctionName) [Expression]
+  | Expression'NotInSubquery Expression SelectStatement
+  | Expression'NotInTable Expression (SchemaQualified TableName)
+  | Expression'NotInValues Expression [Expression]
+  | Expression'NotLike Expression Expression (Maybe Expression)
+  | Expression'NotMatch Expression Expression (Maybe Expression)
+  | Expression'NotRegexp Expression Expression (Maybe Expression)
+  | Expression'Null
+  | Expression'Or Expression Expression
+  | Expression'Plus Expression Expression
+  | Expression'RaiseFunction RaiseFunction
+  | Expression'Regexp Expression Expression (Maybe Expression)
+  | Expression'RowValue RowValue
+  | Expression'ShiftLeft Expression Expression
+  | Expression'ShiftRight Expression Expression
+  | Expression'Subquery SelectStatement
+  | Expression'WindowFunctionCall Text (Maybe FunctionArguments) (Maybe FilterClause) OverClause
 
-makeExpression :: Parser r Expression -> Parser r Expression
-makeExpression _expression = undefined
+runG :: (forall r. Earley.Grammar r (Parser r a)) -> [Token] -> [a]
+runG parser tokens =
+  fst (Earley.fullParses (Earley.parser parser) tokens)
+
+makeExpression :: Parser r SelectStatement -> Earley.Grammar r (Parser r Expression)
+makeExpression selectStatement = mdo
+  filterClause <- Earley.rule (makeFilterClause expression)
+  functionArguments <- Earley.rule (makeFunctionArguments expression)
+
+  expression <-
+    Earley.rule do
+      choice
+        [ Expression'Not <$> expression,
+          expression0
+        ]
+
+  expression0 <- rule oink0 expression1
+  expression1 <- rule oink1 expression2
+  expression2 <- rule (oink2 expression) expression3
+  expression3 <- rule oink3 expression4
+  expression4 <- rule oink4 expression5
+  expression5 <- rule oink5 expression6
+  expression6 <- rule oink6 expression7
+  expression7 <- rule oink7 expression8
+  expression8 <- rule oink8 expression9
+  expression9 <- rule oink9 expression10
+
+  expression10 <-
+    Earley.rule do
+      choice
+        [ Expression'AggregateFunctionCall
+            <$> Token.identifier
+            <*> parens (optional functionArguments)
+            <*> optional filterClause,
+          Expression'BindParameter <$> bindParameter,
+          Expression'Case
+            <$> (Token.case_ *> optional expression)
+            <*> some ((,) <$> (Token.when *> expression) <*> (Token.then_ *> expression))
+            <*> (optional (Token.else_ *> expression) <* Token.end),
+          Expression'Cast <$> (Token.cast *> Token.leftParenthesis *> expression) <*> (Token.as *> typeName),
+          Expression'Column <$> schemaQualified (tableQualified columnName),
+          Expression'Exists <$> (Token.exists *> parens selectStatement),
+          Expression'FunctionCall <$> Token.identifier <*> parens (optional functionArguments),
+          Expression'LiteralValue <$> literalValue,
+          Expression'RaiseFunction <$> raiseFunction,
+          Expression'RowValue <$> makeRowValue expression,
+          Expression'Subquery <$> parens selectStatement,
+          Expression'WindowFunctionCall
+            <$> Token.identifier
+            <*> parens (optional functionArguments)
+            <*> optional filterClause
+            <*> overClause,
+          parens expression
+        ]
+
+  pure expression
+  where
+    rule oink next = mdo
+      e <- Earley.rule (choice (oink e next))
+      pure e
+
+    oink0 e1 e2 =
+      [ Expression'Or <$> e1 <*> (Token.or *> e2),
+        e2
+      ]
+
+    oink1 e1 e2 =
+      [ Expression'And <$> e1 <*> (Token.and *> e2),
+        e2
+      ]
+
+    oink2 e0 e1 e2 =
+      [ (\x0 not_ x1 x2 -> (if not_ then Expression'NotBetween else Expression'Between) x0 x1 x2)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.between *> e0)
+          <*> (Token.and *> e2),
+        Expression'Equals <$> e1 <*> (Token.equalsSign *> e2),
+        Expression'Equals <$> e1 <*> (Token.equalsSignEqualsSign *> e2),
+        (\x0 not_ x1 x2 -> (if not_ then Expression'NotGlob else Expression'Glob) x0 x1 x2)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.glob *> e2)
+          <*> optional (Token.escape *> e2),
+        (\x0 not_ x1 x2 -> (if not_ then Expression'NotInFunction else Expression'InFunction) x0 x1 x2)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.in_ *> schemaQualified functionName)
+          <*> parens (commaSep0 e0),
+        (\x0 not_ x1 -> (if not_ then Expression'NotInSubquery else Expression'InSubquery) x0 x1)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.in_ *> parens selectStatement),
+        (\x0 not_ x1 -> (if not_ then Expression'NotInTable else Expression'InTable) x0 x1)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.in_ *> schemaQualified tableName),
+        (\x0 not_ x1 -> (if not_ then Expression'NotInValues else Expression'InValues) x0 x1)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.in_ *> parens (commaSep0 e0)),
+        (\x0 not_ x1 -> (if not_ then Expression'IsNot else Expression'Is) x0 x1)
+          <$> e1
+          <*> (Token.is *> perhaps Token.not)
+          <*> e2,
+        (\x0 not_ x1 x2 -> (if not_ then Expression'NotLike else Expression'Like) x0 x1 x2)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.like *> e2)
+          <*> optional (Token.escape *> e2),
+        (\x0 not_ x1 x2 -> (if not_ then Expression'NotMatch else Expression'Match) x0 x1 x2)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.match *> e2)
+          <*> optional (Token.escape *> e2),
+        Expression'NotEquals <$> e1 <*> (Token.exclamationMarkEqualsSign *> e2),
+        Expression'NotEquals <$> e1 <*> (Token.lessThanSignGreaterThanSign *> e2),
+        (\x0 not_ x1 x2 -> (if not_ then Expression'NotRegexp else Expression'Regexp) x0 x1 x2)
+          <$> e1
+          <*> perhaps Token.not
+          <*> (Token.regexp *> e2)
+          <*> optional (Token.escape *> e2),
+        (\x0 -> Expression'Is x0 Expression'Null) <$> (e1 <* Token.isnull),
+        (\x0 -> Expression'IsNot x0 Expression'Null) <$> (e1 <* Token.notnull),
+        (\x0 -> Expression'IsNot x0 Expression'Null) <$> (e1 <* (Token.not *> Token.null)),
+        e2
+      ]
+
+    oink3 e1 e2 =
+      [ Expression'GreaterThan <$> e1 <*> (Token.greaterThanSign *> e2),
+        Expression'GreaterThanOrEquals <$> e1 <*> (Token.greaterThanSignEqualsSign *> e2),
+        Expression'LessThan <$> e1 <*> (Token.lessThanSign *> e2),
+        Expression'LessThanOrEquals <$> e1 <*> (Token.lessThanSignEqualsSign *> e2),
+        e2
+      ]
+
+    oink4 e1 e2 =
+      [ Expression'BitwiseAnd <$> e1 <*> (Token.ampersand *> e2),
+        Expression'BitwiseOr <$> e1 <*> (Token.verticalLine *> e2),
+        Expression'ShiftLeft <$> e1 <*> (Token.lessThanSignLessThanSign *> e2),
+        Expression'ShiftRight <$> e1 <*> (Token.greaterThanSignGreaterThanSign *> e2),
+        e2
+      ]
+
+    oink5 e1 e2 =
+      [ Expression'Minus <$> e1 <*> (Token.hyphenMinus *> e2),
+        Expression'Plus <$> e1 <*> (Token.plusSign *> e2),
+        e2
+      ]
+
+    oink6 e1 e2 =
+      [ Expression'Divide <$> e1 <*> (Token.solidus *> e2),
+        Expression'Modulo <$> e1 <*> (Token.percentSign *> e2),
+        Expression'Multiply <$> e1 <*> (Token.asterisk *> e2),
+        e2
+      ]
+
+    oink7 e1 e2 =
+      [ Expression'Concatenate <$> e1 <*> (Token.verticalLineVerticalLine *> e2),
+        e2
+      ]
+
+    oink8 e1 e2 =
+      [ Expression'BitwiseNegate <$> (Token.tilde *> e1),
+        Expression'Negate <$> (Token.hyphenMinus *> e1),
+        Token.plusSign *> e1,
+        e2
+      ]
+
+    oink9 e1 e2 =
+      [ Expression'Collate <$> e1 <*> (Token.collate *> collationName),
+        e2
+      ]
+
+newtype FilterClause
+  = FilterClause Expression
+
+makeFilterClause :: Parser r Expression -> Parser r FilterClause
+makeFilterClause expression =
+  FilterClause
+    <$> (Token.filter *> parens (Token.where_ *> expression))
 
 -- | https://sqlite.org/syntax/foreign-key-clause.html
 data ForeignKeyClause
@@ -298,6 +551,22 @@ newtype FromClause
 
 fromClause :: Parser r FromClause
 fromClause = undefined
+
+data FunctionArguments
+  = FunctionArguments'Arguments Bool (NonEmpty Expression)
+  | FunctionArguments'Wildcard
+
+makeFunctionArguments :: Parser r Expression -> Parser r FunctionArguments
+makeFunctionArguments expression =
+  choice
+    [ FunctionArguments'Arguments <$> perhaps Token.distinct <*> commaSep1 expression,
+      FunctionArguments'Wildcard <$ Token.asterisk
+    ]
+
+data FunctionName
+
+functionName :: Parser r FunctionName
+functionName = undefined
 
 data GeneratedType
   = GeneratedType'Stored
@@ -448,8 +717,40 @@ ordering =
 
 data OrderingTerm
 
+data OverClause
+  = OverClause'WindowDefinition WindowDefinition
+  | OverClause'WindowName WindowName
+
+overClause :: Parser r OverClause
+overClause =
+  Token.over
+    *> choice
+      [ OverClause'WindowDefinition <$> windowDefinition,
+        OverClause'WindowName <$> windowName
+      ]
+
 -- | https://sqlite.org/syntax/qualified-table-name.html
 data QualifiedTableName
+
+-- | https://sqlite.org/syntax/raise-function.html
+data RaiseFunction
+  = RaiseFunction'Abort Text
+  | RaiseFunction'Fail Text
+  | RaiseFunction'Ignore
+  | RaiseFunction'Rollback Text
+
+raiseFunction :: Parser r RaiseFunction
+raiseFunction =
+  Token.raise *> parens (choice xs)
+  where
+    xs =
+      [ RaiseFunction'Abort <$> errorMessage Token.abort,
+        RaiseFunction'Fail <$> errorMessage Token.fail,
+        RaiseFunction'Ignore <$ Token.ignore,
+        RaiseFunction'Rollback <$> errorMessage Token.rollback
+      ]
+    errorMessage p =
+      p *> Token.comma *> Token.string
 
 -- | https://sqlite.org/syntax/returning-clause.html
 newtype ReturningClause
@@ -481,6 +782,17 @@ rollbackStatement =
             *> optional Token.transaction
             *> optional (Token.to *> optional Token.savepoint *> savepointName)
         )
+
+-- | https://www.sqlite.org/rowvalue.html
+data RowValue
+  = RowValue Expression Expression [Expression]
+
+makeRowValue :: Parser r Expression -> Parser r RowValue
+makeRowValue expression =
+  RowValue
+    <$> (Token.leftParenthesis *> expression)
+    <*> (Token.comma *> expression)
+    <*> many (Token.comma *> expression)
 
 newtype SavepointName
   = SavepointName Text
@@ -657,6 +969,15 @@ tableName =
 
 data TableOrSubquery
 
+data TableQualified a
+  = TableQualified (Maybe TableName) a
+
+tableQualified :: Parser r a -> Parser r (TableQualified a)
+tableQualified p =
+  TableQualified
+    <$> (optional tableName <* Token.fullStop)
+    <*> p
+
 data TransactionType
   = TransactionType'Deferred
   | TransactionType'Exclusive
@@ -693,7 +1014,13 @@ windowClause = undefined
 
 data WindowDefinition
 
+windowDefinition :: Parser r WindowDefinition
+windowDefinition = undefined
+
 data WindowName
+
+windowName :: Parser r WindowName
+windowName = undefined
 
 data WithClause = WithClause
   { recursive :: Bool,
