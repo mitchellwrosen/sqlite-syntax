@@ -198,6 +198,10 @@ filter :: Parser r Token
 filter =
   Earley.token FILTER
 
+first :: Parser r Token
+first =
+  Earley.token FIRST
+
 foreign_ :: Parser r Token
 foreign_ =
   Earley.token FOREIGN
@@ -280,6 +284,10 @@ key :: Parser r Token
 key =
   Earley.token KEY
 
+last :: Parser r Token
+last =
+  Earley.token LAST
+
 leftParenthesis :: Parser r Token
 leftParenthesis =
   Earley.token LeftParenthesis
@@ -312,6 +320,10 @@ match :: Parser r Token
 match =
   Earley.token MATCH
 
+materialized :: Parser r Token
+materialized =
+  Earley.token MATERIALIZED
+
 not :: Parser r Token
 not =
   Earley.token NOT
@@ -323,6 +335,10 @@ notnull =
 null :: Parser r Token
 null =
   Earley.token NULL
+
+nulls :: Parser r Token
+nulls =
+  Earley.token NULLS
 
 number :: Parser r Text
 number =
@@ -341,6 +357,10 @@ on =
 or :: Parser r Token
 or =
   Earley.token OR
+
+order :: Parser r Token
+order =
+  Earley.token ORDER
 
 over :: Parser r Token
 over =

@@ -47,6 +47,7 @@ common component
 library
   import: component
   exposed-modules:
+    Sqlite.Syntax
     Sqlite.Syntax.Lexer
     Sqlite.Syntax.Parser
     Sqlite.Syntax.Token
@@ -56,6 +57,7 @@ library
     Sqlite.Syntax.Internal.Type.FilterClause
     Sqlite.Syntax.Internal.Type.FunctionCall
     Sqlite.Syntax.Internal.Type.LiteralValue
+    Sqlite.Syntax.Internal.Type.OrderingTerm
     Sqlite.Syntax.Internal.Type.SchemaQualified
     Sqlite.Syntax.Internal.Type.SelectStatement
     Sqlite.Syntax.Internal.Type.TableQualified
@@ -70,5 +72,7 @@ test-suite tests
   hs-source-dirs: test
   main-is: Test.hs
   other-modules:
+    Gen
     LexerTests
+    ParserTests
   type: exitcode-stdio-1.0

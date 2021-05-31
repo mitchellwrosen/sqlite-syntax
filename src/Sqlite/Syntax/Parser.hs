@@ -10,6 +10,7 @@ import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.FilterClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.LiteralValue
+import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.SchemaQualified
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.TableQualified
@@ -19,6 +20,7 @@ import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
 
 -- TODO simplify some things with defaults (e.g. missing distinct/all == all)
+--      Maybe Ordering -> Ordering
 -- TODO derive show/eq/generic
 -- TODO flatten some things? e.g. UnaryOperator -> flatten into multiple Expression
 -- TODO move signed-number to lexer probably
@@ -72,25 +74,30 @@ data Statement
   | Statement'Release TODO
   | Statement'Rollback RollbackStatement
   | Statement'Savepoint TODO
-  | Statement'Select TODO
+  | Statement'Select SelectStatement
   | Statement'Update TODO
   | Statement'Vacuum TODO
 
-data TODO
+data TODO = TODO
 
 statement :: Earley.Grammar r (Parser r Statement)
 statement = mdo
-  columnDefinition <- Earley.rule (makeColumnDefinition columnConstraint)
-  expression <- makeExpression selectStatement
-  indexedColumn <- Earley.rule (makeIndexedColumn expression)
-  selectStatement <- Earley.rule (makeSelectStatement expression)
+  columnDefinitionParser <- Earley.rule (makeColumnDefinition columnConstraint)
+  expressionParser <- makeExpression selectStatementParser
+  indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
+  selectStatementParser <- makeSelectStatementParser expressionParser
 
-  let alterTableStatement = makeAlterTableStatement columnDefinition
-      attachStatement = makeAttachStatement expression
+  let alterTableStatement = makeAlterTableStatement columnDefinitionParser
+      attachStatement = makeAttachStatement expressionParser
       columnConstraint = makeColumnConstraint columnConstraintType
-      columnConstraintType = makeColumnConstraintType expression
-      createIndexStatement = makeCreateIndexStatement expression indexedColumn
-      createTableStatement = makeCreateTableStatement columnDefinition expression indexedColumn selectStatement
+      columnConstraintType = makeColumnConstraintType expressionParser
+      createIndexStatement = makeCreateIndexStatement expressionParser indexedColumnParser
+      createTableStatement =
+        makeCreateTableStatement
+          columnDefinitionParser
+          expressionParser
+          indexedColumnParser
+          selectStatementParser
 
   pure do
     choice
@@ -101,7 +108,24 @@ statement = mdo
         Statement'Commit <$ commitStatement,
         Statement'CreateIndex <$> createIndexStatement,
         Statement'CreateTable <$> createTableStatement,
-        Statement'Rollback <$> rollbackStatement
+        Statement'CreateTrigger <$> pure TODO,
+        Statement'CreateView <$> pure TODO,
+        Statement'CreateVirtualTable <$> pure TODO,
+        Statement'Delete <$> pure TODO,
+        Statement'Detach <$> pure TODO,
+        Statement'DropIndex <$> pure TODO,
+        Statement'DropTable <$> pure TODO,
+        Statement'DropTrigger <$> pure TODO,
+        Statement'DropView <$> pure TODO,
+        Statement'Insert <$> pure TODO,
+        Statement'Pragma <$> pure TODO,
+        Statement'Reindex <$> pure TODO,
+        Statement'Release <$> pure TODO,
+        Statement'Rollback <$> rollbackStatement,
+        Statement'Savepoint <$> pure TODO,
+        Statement'Select <$> selectStatementParser,
+        Statement'Update <$> pure TODO,
+        Statement'Vacuum <$> pure TODO
       ]
 
 --
@@ -190,7 +214,7 @@ data ColumnConstraintType
   | ColumnConstraintType'ForeignKey ForeignKeyClause
   | ColumnConstraintType'Generated Expression (Maybe GeneratedType)
   | ColumnConstraintType'NotNull (Maybe OnConflictClause)
-  | ColumnConstraintType'PrimaryKey (Maybe Ordering) (Maybe OnConflictClause) Bool
+  | ColumnConstraintType'PrimaryKey Ordering (Maybe OnConflictClause) Bool
   | ColumnConstraintType'Unique (Maybe OnConflictClause)
 
 makeColumnConstraintType :: Parser r Expression -> Parser r ColumnConstraintType
@@ -214,7 +238,7 @@ makeColumnConstraintType expression =
       ColumnConstraintType'NotNull
         <$> (Token.not *> Token.null *> optional onConflictClause),
       ColumnConstraintType'PrimaryKey
-        <$> (Token.primary *> Token.key *> optional orderingParser)
+        <$> (Token.primary *> Token.key *> orderingParser)
         <*> optional onConflictClause
         <*> perhaps Token.autoincrement,
       ColumnConstraintType'Unique
@@ -239,9 +263,6 @@ makeColumnDefinition columnConstraint =
 commitStatement :: Parser r (Maybe Token)
 commitStatement =
   choice [Token.commit, Token.end] *> optional Token.transaction
-
-commonTableExpression :: Parser r CommonTableExpression
-commonTableExpression = undefined
 
 compoundOperator :: Parser r CompoundOperator
 compoundOperator =
@@ -537,7 +558,7 @@ indexOrTableName =
 data IndexedColumn = IndexedColumn
   { column :: Either Text Expression,
     collation :: Maybe Text,
-    ordering :: Maybe Ordering
+    ordering :: Ordering
   }
 
 makeIndexedColumn :: Parser r Expression -> Parser r IndexedColumn
@@ -548,24 +569,7 @@ makeIndexedColumn expression =
         Right <$> expression
       ]
     <*> optional (Token.collate *> Token.identifier)
-    <*> optional orderingParser
-
-makeLimitClause :: Parser r Expression -> Parser r LimitClause
-makeLimitClause expression =
-  munge
-    <$> (Token.limit *> expression)
-    <*> optional
-      ( choice
-          [ Left <$> (Token.offset *> expression),
-            Right <$> (Token.comma *> expression)
-          ]
-      )
-  where
-    munge :: Expression -> Maybe (Either Expression Expression) -> LimitClause
-    munge e1 = \case
-      Nothing -> LimitClause e1 Nothing -- LIMIT x
-      Just (Left e2) -> LimitClause e1 (Just e2) -- LIMIT x OFFSET y
-      Just (Right e2) -> LimitClause e2 (Just e1) -- LIMIT y, x
+    <*> orderingParser
 
 literalValue :: Parser r LiteralValue
 literalValue =
@@ -579,6 +583,13 @@ literalValue =
       LiteralValue'Number <$> Token.number,
       LiteralValue'String <$> Token.string,
       LiteralValue'True <$ Token.true
+    ]
+
+nullsWhichParser :: Parser r NullsWhich
+nullsWhichParser =
+  choice
+    [ NullsWhich'First <$ (Token.nulls *> Token.first),
+      NullsWhich'Last <$ (Token.nulls *> Token.last)
     ]
 
 -- | https://sqlite.org/syntax/conflict-clause.html
@@ -601,16 +612,20 @@ onConflictClause =
         OnConflictClause'Rollback <$ Token.rollback
       ]
 
-data Ordering
-  = Ordering'Asc
-  | Ordering'Desc
-
 orderingParser :: Parser r Ordering
 orderingParser =
   choice
-    [ Ordering'Asc <$ Token.asc,
+    [ Ordering'Asc <$ perhaps Token.asc,
       Ordering'Desc <$ Token.desc
     ]
+
+makeOrderingTermParser :: Parser r Expression -> Parser r OrderingTerm
+makeOrderingTermParser expressionParser =
+  OrderingTerm
+    <$> expressionParser
+    <*> optional (Token.collate *> Token.identifier)
+    <*> orderingParser
+    <*> optional nullsWhichParser
 
 overClause :: Parser r OverClause
 overClause =
@@ -681,8 +696,8 @@ schemaQualified p =
     <$> (optional Token.identifier <* Token.fullStop)
     <*> p
 
-makeSelect :: Parser r Expression -> Parser r Select
-makeSelect expression =
+makeSelectParser :: Parser r Expression -> Parser r Select
+makeSelectParser expression =
   Select
     <$> ( Token.select
             *> choice
@@ -700,29 +715,61 @@ makeSelect expression =
     groupByClause =
       makeGroupByClause expression
 
-makeSelectCore :: Parser r Expression -> Parser r SelectCore
-makeSelectCore expression =
-  choice
-    [ SelectCore'Select <$> select,
-      SelectCore'Values <$> (Token.values *> commaSep1 (parens (commaSep1 expression)))
-    ]
+makeSelectStatementParser :: forall r. Parser r Expression -> Earley.Grammar r (Parser r SelectStatement)
+makeSelectStatementParser expression = mdo
+  commonTableExpressionParser <- Earley.rule (makeCommonTableExpressionParser selectStatementParser)
+  compoundSelectParser <- Earley.rule (makeCompoundSelectParser compoundSelectParser)
+  selectStatementParser <-
+    Earley.rule do
+      SelectStatement
+        <$> (WithClause <$> (Token.with *> perhaps Token.recursive) <*> commaSep1 commonTableExpressionParser)
+        <*> compoundSelectParser
+        <*> optional (Token.order *> Token.by *> commaSep1 (makeOrderingTermParser expression))
+        <*> optional limitClauseParser
+  pure selectStatementParser
   where
-    select =
-      makeSelect expression
-
-makeSelectStatement :: Parser r Expression -> Parser r SelectStatement
-makeSelectStatement expression =
-  SelectStatement
-    <$> withClause
-    <*> ((,) <$> selectCore <*> many ((,) <$> compoundOperator <*> selectCore))
-    <*> optional undefined
-    <*> optional limitClause
-  where
-    limitClause =
-      makeLimitClause expression
-
-    selectCore =
-      makeSelectCore expression
+    limitClauseParser :: Parser r LimitClause
+    limitClauseParser =
+      munge
+        <$> (Token.limit *> expression)
+        <*> optional
+          ( choice
+              [ Left <$> (Token.offset *> expression),
+                Right <$> (Token.comma *> expression)
+              ]
+          )
+      where
+        munge :: Expression -> Maybe (Either Expression Expression) -> LimitClause
+        munge e1 = \case
+          Nothing -> LimitClause e1 Nothing -- LIMIT x
+          Just (Left e2) -> LimitClause e1 (Just e2) -- LIMIT x OFFSET y
+          Just (Right e2) -> LimitClause e2 (Just e1) -- LIMIT y, x
+    makeCommonTableExpressionParser :: Parser r SelectStatement -> Parser r CommonTableExpression
+    makeCommonTableExpressionParser selectStatementParser =
+      CommonTableExpression
+        <$> Token.identifier
+        <*> optional (parens (commaSep1 Token.identifier))
+        <*> ( Token.as
+                *> optional
+                  ( choice
+                      [ False <$ (Token.not *> Token.materialized),
+                        True <$ Token.materialized
+                      ]
+                  )
+            )
+        <*> parens selectStatementParser
+    makeCompoundSelectParser :: Parser r CompoundSelect -> Parser r CompoundSelect
+    makeCompoundSelectParser compoundSelectParser =
+      choice
+        [ CompoundSelect'Compound <$> compoundSelectParser <*> compoundOperator <*> selectCoreParser,
+          CompoundSelect'Simple <$> selectCoreParser
+        ]
+    selectCoreParser :: Parser r SelectCore
+    selectCoreParser =
+      choice
+        [ SelectCore'Select <$> makeSelectParser expression,
+          SelectCore'Values <$> (Token.values *> commaSep1 (parens (commaSep1 expression)))
+        ]
 
 data Sign
   = Sign'HyphenMinus
@@ -826,9 +873,3 @@ windowClause = undefined
 
 windowDefinition :: Parser r WindowDefinition
 windowDefinition = undefined
-
-withClause :: Parser r WithClause
-withClause =
-  WithClause
-    <$> (Token.with *> perhaps Token.recursive)
-    <*> commaSep1 commonTableExpression
