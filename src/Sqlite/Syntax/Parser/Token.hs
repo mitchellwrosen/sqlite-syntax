@@ -118,6 +118,10 @@ create :: Parser r Token
 create =
   Earley.token CREATE
 
+cross :: Parser r Token
+cross =
+  Earley.token CROSS
+
 currentDate :: Parser r Token
 currentDate =
   Earley.token CURRENT_DATE
@@ -206,6 +210,10 @@ foreign_ :: Parser r Token
 foreign_ =
   Earley.token FOREIGN
 
+from :: Parser r Token
+from =
+  Earley.token FROM
+
 fullStop :: Parser r Token
 fullStop =
   Earley.token FullStop
@@ -268,6 +276,10 @@ index :: Parser r Token
 index =
   Earley.token INDEX
 
+inner :: Parser r Token
+inner =
+  Earley.token INNER
+
 intersect :: Parser r Token
 intersect =
   Earley.token INTERSECT
@@ -280,6 +292,10 @@ isnull :: Parser r Token
 isnull =
   Earley.token ISNULL
 
+join :: Parser r Token
+join =
+  Earley.token JOIN
+
 key :: Parser r Token
 key =
   Earley.token KEY
@@ -287,6 +303,10 @@ key =
 last :: Parser r Token
 last =
   Earley.token LAST
+
+left :: Parser r Token
+left =
+  Earley.token LEFT
 
 leftParenthesis :: Parser r Token
 leftParenthesis =
@@ -323,6 +343,10 @@ match =
 materialized :: Parser r Token
 materialized =
   Earley.token MATERIALIZED
+
+natural :: Parser r Token
+natural =
+  Earley.token NATURAL
 
 not :: Parser r Token
 not =
@@ -361,6 +385,10 @@ or =
 order :: Parser r Token
 order =
   Earley.token ORDER
+
+outer :: Parser r Token
+outer =
+  Earley.token OUTER
 
 over :: Parser r Token
 over =
@@ -471,6 +499,10 @@ union =
 unique :: Parser r Token
 unique =
   Earley.token UNIQUE
+
+using :: Parser r Token
+using =
+  Earley.token USING
 
 values :: Parser r Token
 values =
