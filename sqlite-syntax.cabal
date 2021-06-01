@@ -1,5 +1,6 @@
 cabal-version: 2.4
 
+description: Sqlite 3.35.5
 name: sqlite-syntax
 version: 0
 
@@ -54,8 +55,8 @@ library
   hs-source-dirs: src
   other-modules:
     Sqlite.Syntax.Internal.Prelude
+    Sqlite.Syntax.Internal.Type.Aliased
     Sqlite.Syntax.Internal.Type.Expression
-    Sqlite.Syntax.Internal.Type.FilterClause
     Sqlite.Syntax.Internal.Type.FunctionCall
     Sqlite.Syntax.Internal.Type.LiteralValue
     Sqlite.Syntax.Internal.Type.OrderingTerm

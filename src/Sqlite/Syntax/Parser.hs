@@ -8,7 +8,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Sqlite.Syntax.Internal.Prelude
 import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression
-import Sqlite.Syntax.Internal.Type.FilterClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.OrderingTerm
@@ -22,12 +21,10 @@ import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
 
 -- TODO simplify some things with defaults (e.g. missing distinct/all == all)
---      Maybe Ordering -> Ordering
 -- TODO derive show/eq/generic
--- TODO flatten some things? e.g. UnaryOperator -> flatten into multiple Expression
 -- TODO move signed-number to lexer probably
--- TODO FunctionName, etc. -> Identifier
 -- TODO name things *Parser
+-- TODO does 'many' need to be 'rule'd?
 
 type Parser r =
   Token.Parser r
@@ -158,12 +155,11 @@ makeAlterTableStatement columnDefinition =
 
 -- | https://sqlite.org/lang_analyze.html
 data AnalyzeStatement
-  = AnalyzeStatement (Maybe (SchemaQualified IndexOrTableName))
+  = AnalyzeStatement (Maybe (SchemaQualified Text))
 
 analyzeStatement :: Parser r AnalyzeStatement
 analyzeStatement =
-  AnalyzeStatement
-    <$> (Token.analyze *> optional (schemaQualified indexOrTableName))
+  AnalyzeStatement <$> (Token.analyze *> optional (schemaQualified Token.identifier))
 
 -- | https://sqlite.org/syntax/attach-stmt.html
 data AttachStatement = AttachStatement
@@ -173,9 +169,7 @@ data AttachStatement = AttachStatement
 
 makeAttachStatement :: Parser r Expression -> Parser r AttachStatement
 makeAttachStatement expression =
-  AttachStatement
-    <$> (Token.attach *> optional Token.database *> expression)
-    <*> (Token.as *> Token.identifier)
+  AttachStatement <$> (Token.attach *> optional Token.database *> expression) <*> (Token.as *> Token.identifier)
 
 -- | https://sqlite.org/syntax/begin-stmt.html
 newtype BeginStatement
@@ -183,24 +177,10 @@ newtype BeginStatement
 
 beginStatement :: Parser r BeginStatement
 beginStatement =
-  BeginStatement
-    <$> (Token.begin *> optional transactionType <* optional Token.transaction)
+  BeginStatement <$> (Token.begin *> optional transactionType) <* optional Token.transaction
 
 bindParameter :: Parser r BindParameter
 bindParameter = undefined
-
-makeCastExpression :: Parser r Expression -> Parser r CastExpression
-makeCastExpression expression =
-  CastExpression
-    <$> (Token.cast *> Token.leftParenthesis *> expression)
-    <*> (Token.as *> Token.identifier)
-
-newtype ColumnAlias
-  = ColumnAlias Text
-
-columnAlias :: Parser r ColumnAlias
-columnAlias =
-  ColumnAlias <$> undefined
 
 -- | https://sqlite.org/syntax/column-constraint.html
 data ColumnConstraint = ColumnConstraint
@@ -329,8 +309,7 @@ runG parser tokens =
 
 makeExpression :: Parser r SelectStatement -> Earley.Grammar r (Parser r Expression)
 makeExpression selectStatement = mdo
-  filterClause <- Earley.rule (makeFilterClause expression)
-  functionArguments <- Earley.rule (makeFunctionArguments expression)
+  filterClauseParser <- Earley.rule (Token.filter *> parens (Token.where_ *> expression))
 
   expression <-
     Earley.rule do
@@ -354,29 +333,61 @@ makeExpression selectStatement = mdo
     Earley.rule do
       choice
         [ Expression'AggregateFunctionCall
-            <$> Token.identifier
-            <*> parens (optional functionArguments)
-            <*> optional filterClause,
+            <$> ( AggregateFunctionCall
+                    <$> functionCallParser
+                      ( choice
+                          [ AggregateFunctionArguments'Arguments <$> perhaps Token.distinct <*> commaSep1 expression,
+                            AggregateFunctionArguments'Wildcard <$ Token.asterisk,
+                            pure AggregateFunctionArguments'None
+                          ]
+                      )
+                    <*> optional filterClauseParser
+                ),
           Expression'BindParameter <$> bindParameter,
           Expression'Case
-            <$> (Token.case_ *> optional expression)
-            <*> some ((,) <$> (Token.when *> expression) <*> (Token.then_ *> expression))
-            <*> (optional (Token.else_ *> expression) <* Token.end),
-          Expression'Cast <$> makeCastExpression expression,
+            <$> ( CaseExpression
+                    <$> (Token.case_ *> optional expression)
+                    <*> some ((,) <$> (Token.when *> expression) <*> (Token.then_ *> expression))
+                    <*> choice
+                      [ Token.else_ *> expression,
+                        pure (Expression'LiteralValue LiteralValue'Null)
+                      ]
+                    <* Token.end
+                ),
+          Expression'Cast
+            <$> ( CastExpression
+                    <$> (Token.cast *> Token.leftParenthesis *> expression)
+                    <*> (Token.as *> Token.identifier)
+                ),
           Expression'Column <$> schemaQualified (tableQualified Token.identifier),
           Expression'Exists <$> (Token.exists *> parens selectStatement),
-          Expression'FunctionCall <$> Token.identifier <*> parens (optional functionArguments),
+          Expression'FunctionCall <$> simpleFunctionCallParser,
           Expression'LiteralValue <$> literalValue,
           Expression'RaiseFunction <$> raiseFunction,
-          Expression'RowValue <$> makeRowValue expression,
+          Expression'RowValue
+            <$> ( RowValue
+                    <$> (Token.leftParenthesis *> expression)
+                    <*> (Token.comma *> expression)
+                    <*> many (Token.comma *> expression)
+                ),
           Expression'Subquery <$> parens selectStatement,
           Expression'WindowFunctionCall
-            <$> Token.identifier
-            <*> parens (optional functionArguments)
-            <*> optional filterClause
-            <*> overClause,
+            <$> ( WindowFunctionCall
+                    <$> simpleFunctionCallParser
+                    <*> optional filterClauseParser
+                    <*> overClauseParser
+                ),
           parens expression
         ]
+
+  simpleFunctionCallParser <-
+    Earley.rule do
+      functionCallParser
+        ( choice
+            [ FunctionArguments'Arguments <$> commaSep0 expression,
+              FunctionArguments'Wildcard <$ Token.asterisk
+            ]
+        )
 
   pure expression
   where
@@ -395,14 +406,13 @@ makeExpression selectStatement = mdo
       ]
 
     oink2 e0 e1 e2 =
-      [ (\x0 not_ x1 x2 -> (if not_ then Expression'NotBetween else Expression'Between) x0 x1 x2)
+      [ (\x0 not_ x1 x2 -> (if not_ then Expression'Not else id) (Expression'Between x0 x1 x2))
           <$> e1
           <*> perhaps Token.not
           <*> (Token.between *> e0)
           <*> (Token.and *> e2),
-        Expression'Equals <$> e1 <*> (Token.equalsSign *> e2),
-        Expression'Equals <$> e1 <*> (Token.equalsSignEqualsSign *> e2),
-        (\x0 not_ x1 x2 -> (if not_ then Expression'NotGlob else Expression'Glob) x0 x1 x2)
+        Expression'Equals <$> e1 <*> (choice [Token.equalsSign, Token.equalsSignEqualsSign] *> e2),
+        (\x0 not_ x1 x2 -> (if not_ then Expression'Not else id) (Expression'Glob x0 x1 x2))
           <$> e1
           <*> perhaps Token.not
           <*> (Token.glob *> e2)
@@ -423,30 +433,32 @@ makeExpression selectStatement = mdo
           <$> e1
           <*> perhaps Token.not
           <*> (Token.in_ *> parens (commaSep0 e0)),
-        (\x0 not_ x1 -> (if not_ then Expression'IsNot else Expression'Is) x0 x1)
+        (\x0 not_ x1 -> (if not_ then Expression'Not else id) (Expression'Is x0 x1))
           <$> e1
           <*> (Token.is *> perhaps Token.not)
           <*> e2,
-        (\x0 not_ x1 x2 -> (if not_ then Expression'NotLike else Expression'Like) x0 x1 x2)
+        (\x0 -> Expression'Is x0 (Expression'LiteralValue LiteralValue'Null)) <$> e1 <* Token.isnull,
+        (\x0 -> Expression'Not (Expression'Is x0 (Expression'LiteralValue LiteralValue'Null)))
+          <$> e1
+          <* choice [Token.not *> Token.null, Token.notnull],
+        (\x0 not_ x1 x2 -> (if not_ then Expression'Not else id) (Expression'Like x0 x1 x2))
           <$> e1
           <*> perhaps Token.not
           <*> (Token.like *> e2)
           <*> optional (Token.escape *> e2),
-        (\x0 not_ x1 x2 -> (if not_ then Expression'NotMatch else Expression'Match) x0 x1 x2)
+        (\x0 not_ x1 x2 -> (if not_ then Expression'Not else id) (Expression'Match x0 x1 x2))
           <$> e1
           <*> perhaps Token.not
           <*> (Token.match *> e2)
           <*> optional (Token.escape *> e2),
-        Expression'NotEquals <$> e1 <*> (Token.exclamationMarkEqualsSign *> e2),
-        Expression'NotEquals <$> e1 <*> (Token.lessThanSignGreaterThanSign *> e2),
-        (\x0 not_ x1 x2 -> (if not_ then Expression'NotRegexp else Expression'Regexp) x0 x1 x2)
+        Expression'NotEquals
+          <$> e1
+          <*> (choice [Token.exclamationMarkEqualsSign, Token.lessThanSignGreaterThanSign] *> e2),
+        (\x0 not_ x1 x2 -> (if not_ then Expression'Not else id) (Expression'Regexp x0 x1 x2))
           <$> e1
           <*> perhaps Token.not
           <*> (Token.regexp *> e2)
           <*> optional (Token.escape *> e2),
-        (\x0 -> Expression'Is x0 Expression'Null) <$> (e1 <* Token.isnull),
-        (\x0 -> Expression'IsNot x0 Expression'Null) <$> (e1 <* Token.notnull),
-        (\x0 -> Expression'IsNot x0 Expression'Null) <$> (e1 <* (Token.not *> Token.null)),
         e2
       ]
 
@@ -496,34 +508,17 @@ makeExpression selectStatement = mdo
         e2
       ]
 
-makeFilterClause :: Parser r Expression -> Parser r FilterClause
-makeFilterClause expression =
-  FilterClause
-    <$> (Token.filter *> parens (Token.where_ *> expression))
-
 -- | https://sqlite.org/syntax/foreign-key-clause.html
 data ForeignKeyClause
 
 foreignKeyClause :: Parser r ForeignKeyClause
 foreignKeyClause = undefined
 
-makeFunctionArguments :: Parser r Expression -> Parser r FunctionArguments
-makeFunctionArguments expression =
-  choice
-    [ FunctionArguments'Arguments <$> perhaps Token.distinct <*> commaSep1 expression,
-      FunctionArguments'Wildcard <$ Token.asterisk
-    ]
-
 functionCallParser :: Parser r (f Expression) -> Parser r (FunctionCall f)
 functionCallParser arguments =
   FunctionCall
     <$> schemaQualified Token.identifier
     <*> parens arguments
-
-data FunctionName
-
-functionName :: Parser r FunctionName
-functionName = undefined
 
 data GeneratedType
   = GeneratedType'Stored
@@ -541,13 +536,6 @@ makeGroupByClause expression =
   GroupByClause
     <$> (Token.group *> Token.by *> commaSep1 expression)
     <*> optional (Token.having *> expression)
-
-newtype IndexOrTableName
-  = IndexOrTableName Text
-
-indexOrTableName :: Parser r IndexOrTableName
-indexOrTableName =
-  IndexOrTableName <$> Token.identifier
 
 -- | https://sqlite.org/syntax/indexed-column.html
 data IndexedColumn = IndexedColumn
@@ -570,14 +558,14 @@ literalValue :: Parser r LiteralValue
 literalValue =
   choice
     [ LiteralValue'Blob <$> Token.blob,
+      LiteralValue'Boolean False <$ Token.false,
+      LiteralValue'Boolean True <$ Token.true,
       LiteralValue'CurrentDate <$ Token.currentDate,
       LiteralValue'CurrentTime <$ Token.currentTime,
       LiteralValue'CurrentTimestamp <$ Token.currentTimestamp,
-      LiteralValue'False <$ Token.false,
       LiteralValue'Null <$ Token.null,
       LiteralValue'Number <$> Token.number,
-      LiteralValue'String <$> Token.string,
-      LiteralValue'True <$ Token.true
+      LiteralValue'String <$> Token.string
     ]
 
 nullsWhichParser :: Parser r NullsWhich
@@ -622,8 +610,8 @@ makeOrderingTermParser expressionParser =
     <*> orderingParser
     <*> optional nullsWhichParser
 
-overClause :: Parser r OverClause
-overClause =
+overClauseParser :: Parser r OverClause
+overClauseParser =
   Token.over
     *> choice
       [ OverClause'WindowDefinition <$> windowDefinition,
@@ -652,7 +640,7 @@ makeReturningClause = undefined
 
 data ReturningClauseItem
   = ReturningClauseItem'All
-  | ReturningClauseItem'Expression Expression (Maybe ColumnAlias)
+  | ReturningClauseItem'Expression (Aliased Expression)
 
 makeReturningClauseItem :: Parser r Expression -> Parser r ReturningClauseItem
 makeReturningClauseItem = undefined
@@ -669,13 +657,6 @@ rollbackStatement =
             *> optional (Token.to *> optional Token.savepoint *> savepointName)
         )
 
-makeRowValue :: Parser r Expression -> Parser r RowValue
-makeRowValue expression =
-  RowValue
-    <$> (Token.leftParenthesis *> expression)
-    <*> (Token.comma *> expression)
-    <*> many (Token.comma *> expression)
-
 newtype SavepointName
   = SavepointName Text
 
@@ -685,7 +666,7 @@ savepointName = undefined
 schemaQualified :: Parser r a -> Parser r (SchemaQualified a)
 schemaQualified p =
   SchemaQualified
-    <$> (optional Token.identifier <* Token.fullStop)
+    <$> optional (Token.identifier <* Token.fullStop)
     <*> p
 
 makeSelectStatementParser ::
@@ -897,7 +878,8 @@ makeTableDefinition ::
 makeTableDefinition columnDefinition expression indexedColumn =
   TableDefinition
     <$> (Token.leftParenthesis *> commaSep1 columnDefinition)
-    <*> (many (Token.comma *> tableConstraint) <* Token.rightParenthesis)
+    <*> many (Token.comma *> tableConstraint)
+    <* Token.rightParenthesis
     <*> perhaps (Token.without *> Token.rowid)
   where
     tableConstraint =
@@ -906,7 +888,7 @@ makeTableDefinition columnDefinition expression indexedColumn =
 tableQualified :: Parser r a -> Parser r (TableQualified a)
 tableQualified p =
   TableQualified
-    <$> (optional Token.identifier <* Token.fullStop)
+    <$> optional (Token.identifier <* Token.fullStop)
     <*> p
 
 data TransactionType
