@@ -54,11 +54,11 @@ library
     Sqlite.Syntax.Token
   hs-source-dirs: src
   other-modules:
-    Sqlite.Syntax.Internal.Prelude
     Sqlite.Syntax.Internal.Type.Aliased
     Sqlite.Syntax.Internal.Type.Expression
     Sqlite.Syntax.Internal.Type.FunctionCall
     Sqlite.Syntax.Internal.Type.LiteralValue
+    Sqlite.Syntax.Internal.Type.Named
     Sqlite.Syntax.Internal.Type.OrderingTerm
     Sqlite.Syntax.Internal.Type.QualifiedTableName
     Sqlite.Syntax.Internal.Type.SchemaQualified

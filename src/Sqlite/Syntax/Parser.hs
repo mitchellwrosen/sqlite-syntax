@@ -5,11 +5,12 @@ import Control.Applicative.Combinators (choice)
 import Control.Applicative.Combinators.NonEmpty (some)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
-import Sqlite.Syntax.Internal.Prelude
+import Data.Text (Text)
 import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.LiteralValue
+import Sqlite.Syntax.Internal.Type.Named
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.SchemaQualified
@@ -54,8 +55,10 @@ data Statement
   = Statement'AlterTable AlterTableStatement
   | Statement'Analyze AnalyzeStatement
   | Statement'Attach AttachStatement
-  | Statement'Begin BeginStatement
-  | Statement'Commit
+  | -- | https://sqlite.org/syntax/begin-stmt.html
+    Statement'Begin TransactionType
+  | -- | https://sqlite.org/syntax/commit-stmt.html
+    Statement'Commit
   | Statement'CreateIndex CreateIndexStatement
   | Statement'CreateTable CreateTableStatement
   | Statement'CreateTrigger TODO
@@ -71,7 +74,8 @@ data Statement
   | Statement'Pragma TODO
   | Statement'Reindex TODO
   | Statement'Release TODO
-  | Statement'Rollback RollbackStatement
+  | -- | https://sqlite.org/syntax/rollback-stmt.html
+    Statement'Rollback (Maybe Text)
   | Statement'Savepoint TODO
   | Statement'Select SelectStatement
   | Statement'Update TODO
@@ -81,7 +85,7 @@ data TODO = TODO
 
 statement :: Earley.Grammar r (Parser r Statement)
 statement = mdo
-  columnDefinitionParser <- Earley.rule (makeColumnDefinition columnConstraint)
+  columnDefinitionParser <- Earley.rule (makeColumnDefinitionParser expressionParser)
   expressionParser <- makeExpression selectStatementParser
   indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
   qualifiedTableNameParser <- Earley.rule undefined
@@ -89,8 +93,6 @@ statement = mdo
 
   let alterTableStatement = makeAlterTableStatement columnDefinitionParser
       attachStatement = makeAttachStatement expressionParser
-      columnConstraint = makeColumnConstraint columnConstraintType
-      columnConstraintType = makeColumnConstraintType expressionParser
       createIndexStatement = makeCreateIndexStatement expressionParser indexedColumnParser
       createTableStatement =
         makeCreateTableStatement
@@ -104,8 +106,17 @@ statement = mdo
       [ Statement'AlterTable <$> alterTableStatement,
         Statement'Analyze <$> analyzeStatement,
         Statement'Attach <$> attachStatement,
-        Statement'Begin <$> beginStatement,
-        Statement'Commit <$ commitStatement,
+        Statement'Begin
+          <$> ( Token.begin
+                  *> choice
+                    [ TransactionType'Deferred <$ Token.deferred,
+                      TransactionType'Exclusive <$ Token.exclusive,
+                      TransactionType'Immediate <$ Token.immediate,
+                      pure TransactionType'Deferred
+                    ]
+                  <* optional Token.transaction
+              ),
+        Statement'Commit <$ (choice [Token.commit, Token.end] *> optional Token.transaction),
         Statement'CreateIndex <$> createIndexStatement,
         Statement'CreateTable <$> createTableStatement,
         Statement'CreateTrigger <$> pure TODO,
@@ -121,7 +132,11 @@ statement = mdo
         Statement'Pragma <$> pure TODO,
         Statement'Reindex <$> pure TODO,
         Statement'Release <$> pure TODO,
-        Statement'Rollback <$> rollbackStatement,
+        Statement'Rollback
+          <$> ( Token.rollback
+                  *> optional Token.transaction
+                  *> optional (Token.to *> optional Token.savepoint *> Token.identifier)
+              ),
         Statement'Savepoint <$> pure TODO,
         Statement'Select <$> selectStatementParser,
         Statement'Update <$> pure TODO,
@@ -171,85 +186,61 @@ makeAttachStatement :: Parser r Expression -> Parser r AttachStatement
 makeAttachStatement expression =
   AttachStatement <$> (Token.attach *> optional Token.database *> expression) <*> (Token.as *> Token.identifier)
 
--- | https://sqlite.org/syntax/begin-stmt.html
-newtype BeginStatement
-  = BeginStatement (Maybe TransactionType)
-
-beginStatement :: Parser r BeginStatement
-beginStatement =
-  BeginStatement <$> (Token.begin *> optional transactionType) <* optional Token.transaction
-
 bindParameter :: Parser r BindParameter
 bindParameter = undefined
 
--- | https://sqlite.org/syntax/column-constraint.html
-data ColumnConstraint = ColumnConstraint
-  { name :: Maybe Text,
-    constraint :: ColumnConstraintType
-  }
-
-makeColumnConstraint :: Parser r ColumnConstraintType -> Parser r ColumnConstraint
-makeColumnConstraint columnConstraintType =
-  ColumnConstraint
-    <$> optional (Token.constraint *> Token.identifier)
-    <*> columnConstraintType
-
-data ColumnConstraintType
-  = ColumnConstraintType'Check Expression
-  | ColumnConstraintType'Collate Text
-  | ColumnConstraintType'Default Default
-  | ColumnConstraintType'ForeignKey ForeignKeyClause
-  | ColumnConstraintType'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraintType'NotNull (Maybe OnConflictClause)
-  | ColumnConstraintType'PrimaryKey Ordering (Maybe OnConflictClause) Bool
-  | ColumnConstraintType'Unique (Maybe OnConflictClause)
-
-makeColumnConstraintType :: Parser r Expression -> Parser r ColumnConstraintType
-makeColumnConstraintType expression =
-  choice
-    [ ColumnConstraintType'Check
-        <$> (Token.check *> parens expression),
-      ColumnConstraintType'Collate
-        <$> (Token.collate *> Token.identifier),
-      ColumnConstraintType'Default
-        <$> choice
-          [ Default'Expression <$> parens expression,
-            Default'LiteralValue <$> literalValue,
-            Default'SignedNumber <$> signedNumber
-          ],
-      ColumnConstraintType'ForeignKey
-        <$> foreignKeyClause,
-      ColumnConstraintType'Generated
-        <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expression)
-        <*> optional generatedType,
-      ColumnConstraintType'NotNull
-        <$> (Token.not *> Token.null *> optional onConflictClause),
-      ColumnConstraintType'PrimaryKey
-        <$> (Token.primary *> Token.key *> orderingParser)
-        <*> optional onConflictClause
-        <*> perhaps Token.autoincrement,
-      ColumnConstraintType'Unique
-        <$> (Token.unique *> optional onConflictClause)
-    ]
+data ColumnConstraint
+  = ColumnConstraint'Check Expression
+  | ColumnConstraint'Collate Text
+  | ColumnConstraint'Default Default
+  | ColumnConstraint'ForeignKey ForeignKeyClause
+  | ColumnConstraint'Generated Expression (Maybe GeneratedType)
+  | ColumnConstraint'NotNull (Maybe OnConflictClause)
+  | ColumnConstraint'PrimaryKey Ordering (Maybe OnConflictClause) Bool
+  | ColumnConstraint'Unique (Maybe OnConflictClause)
 
 -- | https://sqlite.org/syntax/column-def.html
 data ColumnDefinition = ColumnDefinition
   { name :: Text,
     type_ :: Maybe Text,
-    constraints :: [ColumnConstraint]
+    constraints :: [Named ColumnConstraint]
   }
 
-makeColumnDefinition :: Parser r ColumnConstraint -> Parser r ColumnDefinition
-makeColumnDefinition columnConstraint =
+makeColumnDefinitionParser :: forall r. Parser r Expression -> Parser r ColumnDefinition
+makeColumnDefinitionParser expressionParser =
   ColumnDefinition
     <$> Token.identifier
     <*> optional Token.identifier
-    <*> many columnConstraint
-
--- https://sqlite.org/syntax/commit-stmt.html
-commitStatement :: Parser r (Maybe Token)
-commitStatement =
-  choice [Token.commit, Token.end] *> optional Token.transaction
+    <*> many namedColumnConstraintParser
+  where
+    namedColumnConstraintParser :: Parser r (Named ColumnConstraint)
+    namedColumnConstraintParser =
+      Named
+        <$> optional (Token.constraint *> Token.identifier)
+        <*> columnConstraintParser
+      where
+        columnConstraintParser :: Parser r ColumnConstraint
+        columnConstraintParser =
+          choice
+            [ ColumnConstraint'Check <$> (Token.check *> parens expressionParser),
+              ColumnConstraint'Collate <$> (Token.collate *> Token.identifier),
+              ColumnConstraint'Default
+                <$> choice
+                  [ Default'Expression <$> parens expressionParser,
+                    Default'LiteralValue <$> literalValue,
+                    Default'SignedNumber <$> signedNumber
+                  ],
+              ColumnConstraint'ForeignKey <$> foreignKeyClause,
+              ColumnConstraint'Generated
+                <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expressionParser)
+                <*> optional generatedType,
+              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> optional onConflictClause),
+              ColumnConstraint'PrimaryKey
+                <$> (Token.primary *> Token.key *> orderingParser)
+                <*> optional onConflictClause
+                <*> perhaps Token.autoincrement,
+              ColumnConstraint'Unique <$> (Token.unique *> optional onConflictClause)
+            ]
 
 -- | https://sqlite.org/syntax/create-index-stmt.html
 data CreateIndexStatement = CreateIndexStatement
@@ -280,6 +271,7 @@ data CreateTableStatement = CreateTableStatement
   }
 
 makeCreateTableStatement ::
+  forall r.
   Parser r ColumnDefinition ->
   Parser r Expression ->
   Parser r IndexedColumn ->
@@ -292,11 +284,37 @@ makeCreateTableStatement columnDefinition expression indexedColumn selectStateme
     <*> schemaQualified Token.identifier
     <*> choice
       [ Left <$> (Token.as *> selectStatement),
-        Right <$> tableDefinition
+        Right <$> tableDefinitionParser
       ]
   where
-    tableDefinition =
-      makeTableDefinition columnDefinition expression indexedColumn
+    tableDefinitionParser :: Parser r TableDefinition
+    tableDefinitionParser =
+      TableDefinition
+        <$> (Token.leftParenthesis *> commaSep1 columnDefinition)
+        <*> many (Token.comma *> namedTableConstraintParser)
+        <* Token.rightParenthesis
+        <*> perhaps (Token.without *> Token.rowid)
+      where
+        namedTableConstraintParser :: Parser r (Named TableConstraint)
+        namedTableConstraintParser =
+          Named
+            <$> optional (Token.constraint *> Token.identifier)
+            <*> tableConstraintParser
+          where
+            tableConstraintParser :: Parser r TableConstraint
+            tableConstraintParser =
+              choice
+                [ TableConstraint'Check <$> (Token.check *> parens expression),
+                  TableConstraint'ForeignKey
+                    <$> (Token.foreign_ *> Token.key *> parens (commaSep1 Token.identifier))
+                    <*> foreignKeyClause,
+                  TableConstraint'PrimaryKey
+                    <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumn))
+                    <*> optional onConflictClause,
+                  TableConstraint'Unique
+                    <$> (Token.unique *> parens (commaSep1 indexedColumn))
+                    <*> optional onConflictClause
+                ]
 
 data Default
   = Default'Expression Expression
@@ -531,12 +549,6 @@ generatedType =
       GeneratedType'Virtual <$ Token.virtual
     ]
 
-makeGroupByClause :: Parser r Expression -> Parser r GroupByClause
-makeGroupByClause expression =
-  GroupByClause
-    <$> (Token.group *> Token.by *> commaSep1 expression)
-    <*> optional (Token.having *> expression)
-
 -- | https://sqlite.org/syntax/indexed-column.html
 data IndexedColumn = IndexedColumn
   { column :: Either Text Expression,
@@ -645,24 +657,6 @@ data ReturningClauseItem
 makeReturningClauseItem :: Parser r Expression -> Parser r ReturningClauseItem
 makeReturningClauseItem = undefined
 
--- | https://sqlite.org/syntax/rollback-stmt.html
-newtype RollbackStatement
-  = RollbackStatement (Maybe SavepointName)
-
-rollbackStatement :: Parser r RollbackStatement
-rollbackStatement =
-  RollbackStatement
-    <$> ( Token.rollback
-            *> optional Token.transaction
-            *> optional (Token.to *> optional Token.savepoint *> savepointName)
-        )
-
-newtype SavepointName
-  = SavepointName Text
-
-savepointName :: Parser r SavepointName
-savepointName = undefined
-
 schemaQualified :: Parser r a -> Parser r (SchemaQualified a)
 schemaQualified p =
   SchemaQualified
@@ -753,7 +747,11 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
             <*> commaSep1 (schemaQualified (tableQualified Token.identifier))
             <*> optional (Token.from *> tableParser)
             <*> optional (Token.where_ *> expressionParser)
-            <*> optional (makeGroupByClause expressionParser)
+            <*> optional
+              ( GroupByClause
+                  <$> (Token.group *> Token.by *> commaSep1 expressionParser)
+                  <*> optional (Token.having *> expressionParser)
+              )
             <*> optional windowClause
       selectCoreParser <-
         Earley.rule do
@@ -833,57 +831,17 @@ data TableAlteration
   | TableAlteration'Rename Text
   | TableAlteration'RenameColumn Text Text
 
--- | https://sqlite.org/syntax/table-constraint.html
-data TableConstraint = TableConstraint
-  { name :: Maybe Text,
-    constraint :: TableConstraintType
+data TableConstraint
+  = TableConstraint'Check Expression
+  | TableConstraint'ForeignKey (NonEmpty Text) ForeignKeyClause
+  | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflictClause)
+  | TableConstraint'Unique (NonEmpty IndexedColumn) (Maybe OnConflictClause)
+
+data TableDefinition = TableDefinition
+  { columns :: NonEmpty ColumnDefinition,
+    constraints :: [Named TableConstraint],
+    withoutRowid :: Bool
   }
-
-makeTableConstraint :: Parser r Expression -> Parser r IndexedColumn -> Parser r TableConstraint
-makeTableConstraint expression indexedColumn =
-  TableConstraint
-    <$> optional (Token.constraint *> Token.identifier)
-    <*> makeTableConstraintType expression indexedColumn
-
-data TableConstraintType
-  = TableConstraintType'Check Expression
-  | TableConstraintType'ForeignKey (NonEmpty Text) ForeignKeyClause
-  | TableConstraintType'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflictClause)
-  | TableConstraintType'Unique (NonEmpty IndexedColumn) (Maybe OnConflictClause)
-
-makeTableConstraintType :: Parser r Expression -> Parser r IndexedColumn -> Parser r TableConstraintType
-makeTableConstraintType expression indexedColumn =
-  choice
-    [ TableConstraintType'Check
-        <$> (Token.check *> parens expression),
-      TableConstraintType'ForeignKey
-        <$> (Token.foreign_ *> Token.key *> parens (commaSep1 Token.identifier))
-        <*> foreignKeyClause,
-      TableConstraintType'PrimaryKey
-        <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumn))
-        <*> optional onConflictClause,
-      TableConstraintType'Unique
-        <$> (Token.unique *> parens (commaSep1 indexedColumn))
-        <*> optional onConflictClause
-    ]
-
-data TableDefinition
-  = TableDefinition (NonEmpty ColumnDefinition) [TableConstraint] Bool
-
-makeTableDefinition ::
-  Parser r ColumnDefinition ->
-  Parser r Expression ->
-  Parser r IndexedColumn ->
-  Parser r TableDefinition
-makeTableDefinition columnDefinition expression indexedColumn =
-  TableDefinition
-    <$> (Token.leftParenthesis *> commaSep1 columnDefinition)
-    <*> many (Token.comma *> tableConstraint)
-    <* Token.rightParenthesis
-    <*> perhaps (Token.without *> Token.rowid)
-  where
-    tableConstraint =
-      makeTableConstraint expression indexedColumn
 
 tableQualified :: Parser r a -> Parser r (TableQualified a)
 tableQualified p =
@@ -895,14 +853,6 @@ data TransactionType
   = TransactionType'Deferred
   | TransactionType'Exclusive
   | TransactionType'Immediate
-
-transactionType :: Parser r TransactionType
-transactionType =
-  choice
-    [ TransactionType'Deferred <$ Token.deferred,
-      TransactionType'Exclusive <$ Token.exclusive,
-      TransactionType'Immediate <$ Token.immediate
-    ]
 
 windowClause :: Parser r WindowClause
 windowClause = undefined
