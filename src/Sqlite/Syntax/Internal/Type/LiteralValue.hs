@@ -4,6 +4,7 @@ module Sqlite.Syntax.Internal.Type.LiteralValue
 where
 
 import Data.Text (Text)
+import GHC.Generics (Generic)
 import Prelude
 
 data LiteralValue
@@ -19,3 +20,4 @@ data LiteralValue
     LiteralValue'Null
   | LiteralValue'Number Text
   | LiteralValue'String Text
+  deriving stock (Eq, Generic, Show)

@@ -1,3 +1,5 @@
+-- TODO export list
+-- TODO move types out
 module Sqlite.Syntax.Parser where
 
 import Control.Applicative hiding (some)
@@ -6,6 +8,8 @@ import Control.Applicative.Combinators.NonEmpty (some)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
+import qualified Data.Text as Text
+import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.FunctionCall
@@ -16,16 +20,30 @@ import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.SchemaQualified
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.TableQualified
+import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Sqlite.Syntax.Token (Token)
 import qualified Text.Earley as Earley
-import Prelude hiding (Ordering, fail, not, null)
+import Prelude hiding (Ordering, fail, lex, not, null)
 
 -- TODO simplify some things with defaults (e.g. missing distinct/all == all)
--- TODO derive show/eq/generic
 -- TODO move signed-number to lexer probably
 -- TODO name things *Parser
 -- TODO does 'many' need to be 'rule'd?
+
+--
+
+parseStatement :: Text -> Either Text Statement
+parseStatement sql = do
+  tokens <- lex sql
+  case Earley.fullParses statementParser_ tokens of
+    ([], report) -> Left (Text.pack (show report))
+    ([s], _) -> Right s
+    (ss, _) -> Left (Text.unlines (map (Text.pack . show) ss))
+
+statementParser_ :: Earley.Parser Text [Token] Statement
+statementParser_ =
+  Earley.parser statementParser
 
 type Parser r =
   Token.Parser r
@@ -80,11 +98,13 @@ data Statement
   | Statement'Select SelectStatement
   | Statement'Update TODO
   | Statement'Vacuum TODO
+  deriving stock (Eq, Generic, Show)
 
 data TODO = TODO
+  deriving stock (Eq, Generic, Show)
 
-statement :: Earley.Grammar r (Parser r Statement)
-statement = mdo
+statementParser :: Earley.Grammar r (Parser r Statement)
+statementParser = mdo
   columnDefinitionParser <- Earley.rule (makeColumnDefinitionParser expressionParser)
   expressionParser <- makeExpression selectStatementParser
   indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
@@ -154,6 +174,7 @@ data AlterTableStatement = AlterTableStatement
   { table :: SchemaQualified Text,
     alteration :: TableAlteration
   }
+  deriving stock (Eq, Generic, Show)
 
 makeAlterTableStatement :: Parser r ColumnDefinition -> Parser r AlterTableStatement
 makeAlterTableStatement columnDefinition =
@@ -171,6 +192,7 @@ makeAlterTableStatement columnDefinition =
 -- | https://sqlite.org/lang_analyze.html
 data AnalyzeStatement
   = AnalyzeStatement (Maybe (SchemaQualified Text))
+  deriving stock (Eq, Generic, Show)
 
 analyzeStatement :: Parser r AnalyzeStatement
 analyzeStatement =
@@ -181,6 +203,7 @@ data AttachStatement = AttachStatement
   { database :: Expression,
     schema :: Text
   }
+  deriving stock (Eq, Generic, Show)
 
 makeAttachStatement :: Parser r Expression -> Parser r AttachStatement
 makeAttachStatement expression =
@@ -198,6 +221,7 @@ data ColumnConstraint
   | ColumnConstraint'NotNull (Maybe OnConflictClause)
   | ColumnConstraint'PrimaryKey Ordering (Maybe OnConflictClause) Bool
   | ColumnConstraint'Unique (Maybe OnConflictClause)
+  deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/column-def.html
 data ColumnDefinition = ColumnDefinition
@@ -205,6 +229,7 @@ data ColumnDefinition = ColumnDefinition
     type_ :: Maybe Text,
     constraints :: [Named ColumnConstraint]
   }
+  deriving stock (Eq, Generic, Show)
 
 makeColumnDefinitionParser :: forall r. Parser r Expression -> Parser r ColumnDefinition
 makeColumnDefinitionParser expressionParser =
@@ -251,6 +276,7 @@ data CreateIndexStatement = CreateIndexStatement
     columns :: NonEmpty IndexedColumn,
     where_ :: Maybe Expression
   }
+  deriving stock (Eq, Generic, Show)
 
 makeCreateIndexStatement :: Parser r Expression -> Parser r IndexedColumn -> Parser r CreateIndexStatement
 makeCreateIndexStatement expression indexedColumn =
@@ -269,6 +295,7 @@ data CreateTableStatement = CreateTableStatement
     name :: SchemaQualified Text,
     definition :: Either SelectStatement TableDefinition
   }
+  deriving stock (Eq, Generic, Show)
 
 makeCreateTableStatement ::
   forall r.
@@ -320,6 +347,7 @@ data Default
   = Default'Expression Expression
   | Default'LiteralValue LiteralValue
   | Default'SignedNumber SignedNumber
+  deriving stock (Eq, Generic, Show)
 
 runG :: (forall r. Earley.Grammar r (Parser r a)) -> [Token] -> [a]
 runG parser tokens =
@@ -528,6 +556,8 @@ makeExpression selectStatement = mdo
 
 -- | https://sqlite.org/syntax/foreign-key-clause.html
 data ForeignKeyClause
+  = ForeignKeyClause'TODO
+  deriving stock (Eq, Generic, Show)
 
 foreignKeyClause :: Parser r ForeignKeyClause
 foreignKeyClause = undefined
@@ -541,6 +571,7 @@ functionCallParser arguments =
 data GeneratedType
   = GeneratedType'Stored
   | GeneratedType'Virtual
+  deriving stock (Eq, Generic, Show)
 
 generatedType :: Parser r GeneratedType
 generatedType =
@@ -555,6 +586,7 @@ data IndexedColumn = IndexedColumn
     collation :: Maybe Text,
     ordering :: Ordering
   }
+  deriving stock (Eq, Generic, Show)
 
 makeIndexedColumn :: Parser r Expression -> Parser r IndexedColumn
 makeIndexedColumn expression =
@@ -594,6 +626,7 @@ data OnConflictClause
   | OnConflictClause'Ignore
   | OnConflictClause'Replace
   | OnConflictClause'Rollback
+  deriving stock (Eq, Generic, Show)
 
 onConflictClause :: Parser r OnConflictClause
 onConflictClause =
@@ -646,6 +679,7 @@ raiseParser =
 -- | https://sqlite.org/syntax/returning-clause.html
 newtype ReturningClause
   = ReturningClause (NonEmpty ReturningClauseItem)
+  deriving stock (Eq, Generic, Show)
 
 makeReturningClause :: Parser r ReturningClauseItem -> Parser r ReturningClause
 makeReturningClause = undefined
@@ -653,6 +687,7 @@ makeReturningClause = undefined
 data ReturningClauseItem
   = ReturningClauseItem'All
   | ReturningClauseItem'Expression (Aliased Expression)
+  deriving stock (Eq, Generic, Show)
 
 makeReturningClauseItem :: Parser r Expression -> Parser r ReturningClauseItem
 makeReturningClauseItem = undefined
@@ -807,6 +842,7 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
 data Sign
   = Sign'HyphenMinus
   | Sign'PlusSign
+  deriving stock (Eq, Generic, Show)
 
 sign :: Parser r Sign
 sign =
@@ -818,6 +854,7 @@ sign =
 -- | https://sqlite.org/syntax/signed-number.html
 data SignedNumber
   = SignedNumber (Maybe Sign) Text
+  deriving stock (Eq, Generic, Show)
 
 signedNumber :: Parser r SignedNumber
 signedNumber =
@@ -830,18 +867,21 @@ data TableAlteration
   | TableAlteration'DropColumn Text
   | TableAlteration'Rename Text
   | TableAlteration'RenameColumn Text Text
+  deriving stock (Eq, Generic, Show)
 
 data TableConstraint
   = TableConstraint'Check Expression
   | TableConstraint'ForeignKey (NonEmpty Text) ForeignKeyClause
   | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflictClause)
   | TableConstraint'Unique (NonEmpty IndexedColumn) (Maybe OnConflictClause)
+  deriving stock (Eq, Generic, Show)
 
 data TableDefinition = TableDefinition
   { columns :: NonEmpty ColumnDefinition,
     constraints :: [Named TableConstraint],
     withoutRowid :: Bool
   }
+  deriving stock (Eq, Generic, Show)
 
 tableQualified :: Parser r a -> Parser r (TableQualified a)
 tableQualified p =
@@ -853,6 +893,7 @@ data TransactionType
   = TransactionType'Deferred
   | TransactionType'Exclusive
   | TransactionType'Immediate
+  deriving stock (Eq, Generic, Show)
 
 windowClause :: Parser r WindowClause
 windowClause = undefined

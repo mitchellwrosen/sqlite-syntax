@@ -1,6 +1,7 @@
 module Sqlite.Syntax.Internal.Type.OrderingTerm where
 
 import Data.Text (Text)
+import GHC.Generics (Generic)
 import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression
 import Prelude hiding (Ordering)
 
@@ -9,12 +10,14 @@ data NullsWhich
     NullsWhich'First
   | -- | @NULLS LAST@
     NullsWhich'Last
+  deriving stock (Eq, Generic, Show)
 
 data Ordering
   = -- | @ASC@
     Ordering'Asc
   | -- | @DESC@
     Ordering'Desc
+  deriving stock (Eq, Generic, Show)
 
 data OrderingTerm = OrderingTerm
   { expression :: Expression,
@@ -22,3 +25,4 @@ data OrderingTerm = OrderingTerm
     ordering :: Ordering,
     nullsWhich :: Maybe NullsWhich
   }
+  deriving stock (Eq, Generic, Show)

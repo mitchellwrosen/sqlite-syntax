@@ -37,6 +37,7 @@ common component
     RankNTypes
     RecursiveDo
     ScopedTypeVariables
+    StandaloneDeriving
     TupleSections
     TypeApplications
     TypeOperators
@@ -70,6 +71,7 @@ library
 test-suite tests
   import: component
   build-depends:
+    directory,
     hedgehog,
     sqlite-syntax,
   hs-source-dirs: test

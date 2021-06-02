@@ -2,6 +2,7 @@ module Sqlite.Syntax.Internal.Type.Expression where
 
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
+import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.FunctionCall (FunctionCall)
 import Sqlite.Syntax.Internal.Type.LiteralValue (LiteralValue)
 import Sqlite.Syntax.Internal.Type.SchemaQualified (SchemaQualified)
@@ -13,9 +14,12 @@ data AggregateFunctionCall = AggregateFunctionCall
   { call :: FunctionCall AggregateFunctionArguments,
     filter :: Maybe Expression
   }
+  deriving stock (Eq, Generic, Show)
 
 -- TODO move this
 data BindParameter
+  = BindParameter'TODO
+  deriving stock (Eq, Generic, Show)
 
 -- | @CASE ... WHEN ... THEN ... ELSE ... END@
 data CaseExpression = CaseExpression
@@ -23,16 +27,19 @@ data CaseExpression = CaseExpression
     cases :: NonEmpty (Expression, Expression),
     else_ :: Expression
   }
+  deriving stock (Eq, Generic, Show)
 
 data CastExpression = CastExpression
   { expression :: Expression,
     type_ :: Text
   }
+  deriving stock (Eq, Generic, Show)
 
 data CollateExpression = CollateExpression
   { expression :: Expression,
     collation :: Text
   }
+  deriving stock (Eq, Generic, Show)
 
 data Expression
   = Expression'AggregateFunctionCall AggregateFunctionCall
@@ -107,40 +114,48 @@ data Expression
     Expression'ShiftRight Expression Expression
   | Expression'Subquery SelectStatement
   | Expression'WindowFunctionCall WindowFunctionCall
+  deriving stock (Eq, Generic, Show)
 
 data InFunctionExpression = InFunctionExpression
   { expression :: Expression,
     function :: FunctionCall []
   }
+  deriving stock (Eq, Generic, Show)
 
 data InSubqueryExpression = InSubqueryExpression
   { expression :: Expression,
     subquery :: SelectStatement
   }
+  deriving stock (Eq, Generic, Show)
 
 data InTableExpression = InTableExpression
   { expression :: Expression,
     table :: SchemaQualified Text
   }
+  deriving stock (Eq, Generic, Show)
 
 data InValuesExpression = InValuesExpression
   { expression :: Expression,
     values :: [Expression]
   }
+  deriving stock (Eq, Generic, Show)
 
 data FunctionArguments expression
   = FunctionArguments'Arguments [expression]
   | FunctionArguments'Wildcard
+  deriving stock (Eq, Generic, Show)
 
 data AggregateFunctionArguments expression
   = AggregateFunctionArguments'Arguments Bool (NonEmpty expression)
   | AggregateFunctionArguments'None
   | AggregateFunctionArguments'Wildcard
+  deriving stock (Eq, Generic, Show)
 
 -- TODO move this
 data OverClause
   = OverClause'WindowDefinition WindowDefinition
   | OverClause'WindowName Text
+  deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/raise-function.html
 data Raise
@@ -148,17 +163,22 @@ data Raise
   | Raise'Fail Text
   | Raise'Ignore
   | Raise'Rollback Text
+  deriving stock (Eq, Generic, Show)
 
 -- | https://www.sqlite.org/rowvalue.html
 -- TODO move this
 data RowValue
   = RowValue Expression Expression [Expression]
+  deriving stock (Eq, Generic, Show)
 
 -- TODO move this
 data WindowDefinition
+  = WindowDefinition'TODO
+  deriving stock (Eq, Generic, Show)
 
 data WindowFunctionCall = WindowFunctionCall
   { call :: FunctionCall FunctionArguments,
     filter :: Maybe Expression,
     over :: OverClause
   }
+  deriving stock (Eq, Generic, Show)

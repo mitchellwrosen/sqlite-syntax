@@ -4,6 +4,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Sqlite.Syntax.Internal.Type.Aliased
 import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression
+import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
@@ -19,6 +20,7 @@ data CommonTableExpression = CommonTableExpression
     materialized :: Maybe Bool,
     select :: SelectStatement
   }
+  deriving stock (Eq, Generic, Show)
 
 data CompoundSelect
   = CompoundSelect SelectCore
@@ -30,6 +32,7 @@ data CompoundSelect
     CompoundSelect'Union CompoundSelect SelectCore
   | -- | @... UNION ALL ...@
     CompoundSelect'UnionAll CompoundSelect SelectCore
+  deriving stock (Eq, Generic, Show)
 
 data GroupByClause = GroupByClause
   { -- | @GROUP BY ...@
@@ -37,6 +40,7 @@ data GroupByClause = GroupByClause
     -- | @HAVING ...@
     having :: Maybe Expression
   }
+  deriving stock (Eq, Generic, Show)
 
 -- | https://www.sqlite.org/syntax/join-constraint.html
 data JoinConstraint
@@ -44,6 +48,7 @@ data JoinConstraint
     JoinConstraint'On Expression
   | -- | @USING ...@
     JoinConstraint'Using (NonEmpty Text)
+  deriving stock (Eq, Generic, Show)
 
 data LimitClause = LimitClause
   { -- | @LIMIT ...@
@@ -51,6 +56,7 @@ data LimitClause = LimitClause
     -- | @OFFSET ...@
     offset :: Maybe Expression
   }
+  deriving stock (Eq, Generic, Show)
 
 data Select = Select
   { -- | @DISTINCT@
@@ -64,6 +70,7 @@ data Select = Select
     groupBy :: Maybe GroupByClause,
     window :: Maybe WindowClause
   }
+  deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/select-core.html
 data SelectCore
@@ -71,6 +78,7 @@ data SelectCore
     SelectCore'Select Select
   | -- | @VALUES ...@
     SelectCore'Values (NonEmpty (NonEmpty Expression))
+  deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/select-stmt.html
 data SelectStatement = SelectStatement
@@ -83,6 +91,7 @@ data SelectStatement = SelectStatement
     -- | @LIMIT ...@
     limit :: Maybe LimitClause
   }
+  deriving stock (Eq, Generic, Show)
 
 -- |
 -- * https://www.sqlite.org/syntax/join-clause.html
@@ -97,12 +106,15 @@ data Table
   | Table'NaturalInnerJoin Table Table
   | Table'NaturalLeftOuterJoin Table Table
   | Table'Subquery (Aliased SelectStatement)
+  deriving stock (Eq, Generic, Show)
 
 newtype WindowClause
   = WindowClause (NonEmpty (Text, WindowDefinition))
+  deriving stock (Eq, Generic, Show)
 
 data WithClause = WithClause
   { -- | @RECURSIVE@
     recursive :: Bool,
     commonTableExpressions :: NonEmpty CommonTableExpression
   }
+  deriving stock (Eq, Generic, Show)
