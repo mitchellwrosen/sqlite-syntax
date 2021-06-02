@@ -98,7 +98,7 @@ data Expression
     Expression'Or Expression Expression
   | -- | @... + ...@
     Expression'Plus Expression Expression
-  | Expression'RaiseFunction RaiseFunction
+  | Expression'Raise Raise
   | Expression'Regexp Expression Expression (Maybe Expression)
   | Expression'RowValue RowValue
   | -- | @... << ...@
@@ -143,12 +143,11 @@ data OverClause
   | OverClause'WindowName Text
 
 -- | https://sqlite.org/syntax/raise-function.html
--- TODO move this
-data RaiseFunction
-  = RaiseFunction'Abort Text
-  | RaiseFunction'Fail Text
-  | RaiseFunction'Ignore
-  | RaiseFunction'Rollback Text
+data Raise
+  = Raise'Abort Text
+  | Raise'Fail Text
+  | Raise'Ignore
+  | Raise'Rollback Text
 
 -- | https://www.sqlite.org/rowvalue.html
 -- TODO move this

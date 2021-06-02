@@ -381,7 +381,7 @@ makeExpression selectStatement = mdo
           Expression'Exists <$> (Token.exists *> parens selectStatement),
           Expression'FunctionCall <$> simpleFunctionCallParser,
           Expression'LiteralValue <$> literalValue,
-          Expression'RaiseFunction <$> raiseFunction,
+          Expression'Raise <$> raiseParser,
           Expression'RowValue
             <$> ( RowValue
                     <$> (Token.leftParenthesis *> expression)
@@ -630,15 +630,15 @@ overClauseParser =
         OverClause'WindowName <$> Token.identifier
       ]
 
-raiseFunction :: Parser r RaiseFunction
-raiseFunction =
+raiseParser :: Parser r Raise
+raiseParser =
   Token.raise *> parens (choice xs)
   where
     xs =
-      [ RaiseFunction'Abort <$> errorMessage Token.abort,
-        RaiseFunction'Fail <$> errorMessage Token.fail,
-        RaiseFunction'Ignore <$ Token.ignore,
-        RaiseFunction'Rollback <$> errorMessage Token.rollback
+      [ Raise'Abort <$> errorMessage Token.abort,
+        Raise'Fail <$> errorMessage Token.fail,
+        Raise'Ignore <$ Token.ignore,
+        Raise'Rollback <$> errorMessage Token.rollback
       ]
     errorMessage p =
       p *> Token.comma *> Token.string

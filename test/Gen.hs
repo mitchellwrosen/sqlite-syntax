@@ -8,13 +8,28 @@ import Sqlite.Syntax
 import Prelude
 
 genAggregateFunctionCall :: Gen AggregateFunctionCall
-genAggregateFunctionCall = undefined
+genAggregateFunctionCall =
+  AggregateFunctionCall
+    <$> genFunctionCall genAggregateFunctionArguments
+    <*> Gen.maybe genExpression
+
+genAggregateFunctionArguments :: Gen (AggregateFunctionArguments Expression)
+genAggregateFunctionArguments =
+  Gen.choice
+    [ pure AggregateFunctionArguments'None,
+      pure AggregateFunctionArguments'Wildcard,
+      AggregateFunctionArguments'Arguments <$> Gen.bool <*> Gen.nonEmpty (Range.linear 1 5) genExpression
+    ]
 
 genBindParameter :: Gen BindParameter
 genBindParameter = undefined
 
 genCaseExpression :: Gen CaseExpression
-genCaseExpression = undefined
+genCaseExpression =
+  CaseExpression
+    <$> Gen.maybe genExpression
+    <*> Gen.nonEmpty (Range.linear 1 5) ((,) <$> genExpression <*> genExpression)
+    <*> genExpression
 
 genExpression :: Gen Expression
 genExpression =
@@ -23,7 +38,7 @@ genExpression =
     [ Expression'BindParameter <$> genBindParameter,
       Expression'Column <$> genSchemaQualified (genTableQualified genIdentifier),
       Expression'LiteralValue <$> genLiteralValue,
-      Expression'RaiseFunction <$> genRaiseFunction
+      Expression'Raise <$> genRaise
     ]
     [ Expression'AggregateFunctionCall <$> genAggregateFunctionCall,
       Expression'Case <$> genCaseExpression,
@@ -76,8 +91,6 @@ genExpression =
       Gen.subterm3 genExpression genExpression genExpression Expression'Between
     ]
 
---   Expression'WindowFunctionCall WindowFunctionCall
-
 genFunctionArguments :: Gen (FunctionArguments Expression)
 genFunctionArguments =
   Gen.choice
@@ -86,21 +99,43 @@ genFunctionArguments =
     ]
 
 genFunctionCall :: Gen (f Expression) -> Gen (FunctionCall f)
-genFunctionCall = undefined
+genFunctionCall gen =
+  FunctionCall
+    <$> genSchemaQualified genIdentifier
+    <*> gen
 
 genGroupByClause :: Gen GroupByClause
-genGroupByClause = undefined
+genGroupByClause =
+  GroupByClause
+    <$> Gen.nonEmpty (Range.linear 1 5) genExpression
+    <*> Gen.maybe genExpression
 
 genLiteralValue :: Gen LiteralValue
-genLiteralValue = undefined
+genLiteralValue =
+  Gen.choice
+    [ pure LiteralValue'Null,
+      LiteralValue'Boolean <$> Gen.bool,
+      pure LiteralValue'CurrentDate,
+      pure LiteralValue'CurrentTime,
+      pure LiteralValue'CurrentTimestamp,
+      LiteralValue'Number <$> Gen.element ["1", "1.0"],
+      LiteralValue'Blob <$> Gen.element ["00", "01"],
+      LiteralValue'String <$> Gen.element ["foo", "bar"]
+    ]
 
 -- TODO better generator
 genIdentifier :: Gen Text
 genIdentifier =
   Gen.element ["foo", "bar", "baz"]
 
-genRaiseFunction :: Gen RaiseFunction
-genRaiseFunction = undefined
+genRaise :: Gen Raise
+genRaise =
+  Gen.element
+    [ Raise'Ignore,
+      Raise'Abort "error",
+      Raise'Fail "error",
+      Raise'Rollback "error"
+    ]
 
 genSchemaQualified :: Gen a -> Gen (SchemaQualified a)
 genSchemaQualified gen =
