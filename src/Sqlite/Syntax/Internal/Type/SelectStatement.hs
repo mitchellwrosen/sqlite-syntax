@@ -1,10 +1,11 @@
 module Sqlite.Syntax.Internal.Type.SelectStatement where
 
+import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
-import Sqlite.Syntax.Internal.Type.Aliased
-import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression
 import GHC.Generics (Generic)
+import Sqlite.Syntax.Internal.Type.Aliased (Aliased)
+import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
@@ -68,7 +69,7 @@ data Select = Select
     where_ :: Maybe Expression,
     -- | @GROUP BY ...@
     groupBy :: Maybe GroupByClause,
-    window :: Maybe WindowClause
+    window :: Maybe (NonEmpty (Aliased Identity WindowDefinition))
   }
   deriving stock (Eq, Generic, Show)
 
@@ -99,17 +100,13 @@ data SelectStatement = SelectStatement
 data Table
   = Table QualifiedTableName
   | Table'CrossJoin Table Table (Maybe JoinConstraint)
-  | Table'Function (Aliased (FunctionCall NonEmpty))
+  | Table'Function (Aliased Maybe (FunctionCall NonEmpty))
   | Table'InnerJoin Table Table (Maybe JoinConstraint)
   | Table'LeftOuterJoin Table Table (Maybe JoinConstraint)
   | Table'NaturalCrossJoin Table Table
   | Table'NaturalInnerJoin Table Table
   | Table'NaturalLeftOuterJoin Table Table
-  | Table'Subquery (Aliased SelectStatement)
-  deriving stock (Eq, Generic, Show)
-
-newtype WindowClause
-  = WindowClause (NonEmpty (Text, WindowDefinition))
+  | Table'Subquery (Aliased Maybe SelectStatement)
   deriving stock (Eq, Generic, Show)
 
 data WithClause = WithClause

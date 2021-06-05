@@ -572,6 +572,10 @@ where_ :: Parser r Token
 where_ =
   Earley.token WHERE
 
+window :: Parser r Token
+window =
+  Earley.token WINDOW
+
 with :: Parser r Token
 with =
   Earley.token WITH

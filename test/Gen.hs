@@ -1,5 +1,7 @@
 module Gen where
 
+import Data.Functor.Identity
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Hedgehog (Gen)
 import qualified Hedgehog.Gen as Gen
@@ -150,6 +152,9 @@ genSelect =
     <*> Gen.maybe genExpression
     <*> Gen.maybe genGroupByClause
     <*> Gen.maybe genWindowClause
+  where
+    genWindowClause :: Gen (NonEmpty (Aliased Identity WindowDefinition))
+    genWindowClause = undefined
 
 genSelectStatement :: Gen SelectStatement
 genSelectStatement = undefined
@@ -160,9 +165,6 @@ genTable = undefined
 genTableQualified :: Gen a -> Gen (TableQualified a)
 genTableQualified gen =
   TableQualified <$> Gen.maybe genIdentifier <*> gen
-
-genWindowClause :: Gen WindowClause
-genWindowClause = undefined
 
 genWindowFunctionCall :: Gen WindowFunctionCall
 genWindowFunctionCall = undefined

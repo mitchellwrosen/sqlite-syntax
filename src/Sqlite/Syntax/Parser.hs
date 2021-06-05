@@ -5,6 +5,7 @@ module Sqlite.Syntax.Parser where
 import Control.Applicative hiding (some)
 import Control.Applicative.Combinators (choice)
 import Control.Applicative.Combinators.NonEmpty (some)
+import Data.Functor.Identity (Identity (..))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
@@ -167,9 +168,9 @@ statementParser = mdo
 
 --
 
-aliasedParser :: Parser r a -> Parser r (Aliased a)
-aliasedParser parser =
-  Aliased <$> parser <*> optional (Token.as *> Token.identifier)
+-- aliasedParser :: Parser r a -> Parser r (Aliased a)
+-- aliasedParser parser =
+--   Aliased <$> parser <*> optional (Token.as *> Token.identifier)
 
 -- | https://sqlite.org/lang_altertable.html
 data AlterTableStatement = AlterTableStatement
@@ -704,7 +705,7 @@ overClauseParser :: Parser r OverClause
 overClauseParser =
   Token.over
     *> choice
-      [ OverClause'WindowDefinition <$> windowDefinition,
+      [ OverClause'WindowDefinition <$> windowDefinitionParser,
         OverClause'WindowName <$> Token.identifier
       ]
 
@@ -731,7 +732,7 @@ makeReturningClause = undefined
 
 data ReturningClauseItem
   = ReturningClauseItem'All
-  | ReturningClauseItem'Expression (Aliased Expression)
+  | ReturningClauseItem'Expression (Aliased Maybe Expression)
   deriving stock (Eq, Generic, Show)
 
 makeReturningClauseItem :: Parser r Expression -> Parser r ReturningClauseItem
@@ -832,7 +833,7 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
                   <$> (Token.group *> Token.by *> commaSep1 expressionParser)
                   <*> optional (Token.having *> expressionParser)
               )
-            <*> optional windowClause
+            <*> optional windowClauseParser
       selectCoreParser <-
         Earley.rule do
           choice
@@ -841,6 +842,15 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
             ]
       valuesParser <- Earley.rule (Token.values *> commaSep1 (parens (commaSep1 expressionParser)))
       pure compoundSelectParser
+      where
+        windowClauseParser :: Parser r (NonEmpty (Aliased Identity WindowDefinition))
+        windowClauseParser =
+          Token.window
+            *> commaSep1
+              ( (\x y -> Aliased y (Identity x))
+                  <$> Token.identifier
+                  <*> (Token.as *> windowDefinitionParser)
+              )
 
     makeTableParser :: Parser r SelectStatement -> Earley.Grammar r (Parser r Table)
     makeTableParser selectStatementParser = mdo
@@ -878,8 +888,12 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
         Earley.rule do
           choice
             [ Table <$> qualifiedTableNameParser,
-              Table'Function <$> aliasedParser (functionCallParser (commaSep1 expressionParser)),
-              Table'Subquery <$> aliasedParser (parens selectStatementParser),
+              Table'Function
+                <$> ( Aliased
+                        <$> functionCallParser (commaSep1 expressionParser)
+                        <*> optional (Token.as *> Token.identifier)
+                    ),
+              Table'Subquery <$> (Aliased <$> parens selectStatementParser <*> optional (Token.as *> Token.identifier)),
               parens tableParser
             ]
       pure tableParser
@@ -940,8 +954,5 @@ data TransactionType
   | TransactionType'Immediate
   deriving stock (Eq, Generic, Show)
 
-windowClause :: Parser r WindowClause
-windowClause = undefined
-
-windowDefinition :: Parser r WindowDefinition
-windowDefinition = undefined
+windowDefinitionParser :: Parser r WindowDefinition
+windowDefinitionParser = undefined

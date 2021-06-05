@@ -7,8 +7,12 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Prelude
 
-data Aliased a = Aliased
+data Aliased f a = Aliased
   { value :: a,
-    alias :: Maybe Text
+    alias :: f Text
   }
-  deriving stock (Eq, Generic, Show)
+  deriving stock (Generic)
+
+deriving instance (Eq a, Eq (f Text)) => Eq (Aliased f a)
+
+deriving instance (Show a, Show (f Text)) => Show (Aliased f a)

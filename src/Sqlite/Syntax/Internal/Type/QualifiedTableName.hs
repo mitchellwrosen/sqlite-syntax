@@ -17,5 +17,5 @@ data IndexedBy
 
 -- | https://sqlite.org/syntax/qualified-table-name.html
 data QualifiedTableName
-  = QualifiedTableName (Aliased (SchemaQualified Text)) (Maybe IndexedBy)
+  = QualifiedTableName (Aliased Maybe (SchemaQualified Text)) (Maybe IndexedBy)
   deriving stock (Eq, Generic, Show)
