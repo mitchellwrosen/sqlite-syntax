@@ -12,6 +12,10 @@ abort :: Parser r Token
 abort =
   Earley.token ABORT
 
+action :: Parser r Token
+action =
+  Earley.token ACTION
+
 add :: Parser r Token
 add =
   Earley.token ADD
@@ -78,6 +82,10 @@ by :: Parser r Token
 by =
   Earley.token BY
 
+cascade :: Parser r Token
+cascade =
+  Earley.token CASCADE
+
 case_ :: Parser r Token
 case_ =
   Earley.token CASE
@@ -138,9 +146,21 @@ database :: Parser r Token
 database =
   Earley.token DATABASE
 
+default_ :: Parser r Token
+default_ =
+  Earley.token DEFAULT
+
+deferrable :: Parser r Token
+deferrable =
+  Earley.token DEFERRABLE
+
 deferred :: Parser r Token
 deferred =
   Earley.token DEFERRED
+
+delete :: Parser r Token
+delete =
+  Earley.token DELETE
 
 desc :: Parser r Token
 desc =
@@ -276,6 +296,10 @@ index :: Parser r Token
 index =
   Earley.token INDEX
 
+initially :: Parser r Token
+initially =
+  Earley.token INITIALLY
+
 inner :: Parser r Token
 inner =
   Earley.token INNER
@@ -348,6 +372,10 @@ natural :: Parser r Token
 natural =
   Earley.token NATURAL
 
+no :: Parser r Token
+no =
+  Earley.token NO
+
 not :: Parser r Token
 not =
   Earley.token NOT
@@ -414,6 +442,10 @@ recursive :: Parser r Token
 recursive =
   Earley.token RECURSIVE
 
+references :: Parser r Token
+references =
+  Earley.token REFERENCES
+
 regexp :: Parser r Token
 regexp =
   Earley.token REGEXP
@@ -425,6 +457,10 @@ rename =
 replace :: Parser r Token
 replace =
   Earley.token REPLACE
+
+restrict :: Parser r Token
+restrict =
+  Earley.token RESTRICT
 
 rightParenthesis :: Parser r Token
 rightParenthesis =
@@ -445,6 +481,10 @@ savepoint =
 select :: Parser r Token
 select =
   Earley.token SELECT
+
+set :: Parser r Token
+set =
+  Earley.token SET
 
 solidus :: Parser r Token
 solidus =
@@ -499,6 +539,10 @@ union =
 unique :: Parser r Token
 unique =
   Earley.token UNIQUE
+
+update :: Parser r Token
+update =
+  Earley.token UPDATE
 
 using :: Parser r Token
 using =

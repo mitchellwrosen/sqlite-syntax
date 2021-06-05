@@ -38,6 +38,7 @@ common component
     RecursiveDo
     ScopedTypeVariables
     StandaloneDeriving
+    StrictData
     TupleSections
     TypeApplications
     TypeOperators
@@ -57,6 +58,7 @@ library
   other-modules:
     Sqlite.Syntax.Internal.Type.Aliased
     Sqlite.Syntax.Internal.Type.Expression
+    Sqlite.Syntax.Internal.Type.ForeignKeyClause
     Sqlite.Syntax.Internal.Type.FunctionCall
     Sqlite.Syntax.Internal.Type.LiteralValue
     Sqlite.Syntax.Internal.Type.Named

@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression
+import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
@@ -23,6 +24,7 @@ import Sqlite.Syntax.Internal.Type.TableQualified
 import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Sqlite.Syntax.Token (Token)
+import qualified Sqlite.Syntax.Token as Token
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, lex, not, null)
 
@@ -218,9 +220,9 @@ data ColumnConstraint
   | ColumnConstraint'Default Default
   | ColumnConstraint'ForeignKey ForeignKeyClause
   | ColumnConstraint'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraint'NotNull (Maybe OnConflictClause)
-  | ColumnConstraint'PrimaryKey Ordering (Maybe OnConflictClause) Bool
-  | ColumnConstraint'Unique (Maybe OnConflictClause)
+  | ColumnConstraint'NotNull (Maybe OnConflict)
+  | ColumnConstraint'PrimaryKey Ordering (Maybe OnConflict) Bool
+  | ColumnConstraint'Unique (Maybe OnConflict)
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/column-def.html
@@ -255,16 +257,16 @@ makeColumnDefinitionParser expressionParser =
                     Default'LiteralValue <$> literalValue,
                     Default'SignedNumber <$> signedNumber
                   ],
-              ColumnConstraint'ForeignKey <$> foreignKeyClause,
+              ColumnConstraint'ForeignKey <$> foreignKeyClauseParser,
               ColumnConstraint'Generated
                 <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expressionParser)
                 <*> optional generatedType,
-              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> optional onConflictClause),
+              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> optional onConflictParser),
               ColumnConstraint'PrimaryKey
                 <$> (Token.primary *> Token.key *> orderingParser)
-                <*> optional onConflictClause
+                <*> optional onConflictParser
                 <*> perhaps Token.autoincrement,
-              ColumnConstraint'Unique <$> (Token.unique *> optional onConflictClause)
+              ColumnConstraint'Unique <$> (Token.unique *> optional onConflictParser)
             ]
 
 -- | https://sqlite.org/syntax/create-index-stmt.html
@@ -334,13 +336,13 @@ makeCreateTableStatement columnDefinition expression indexedColumn selectStateme
                 [ TableConstraint'Check <$> (Token.check *> parens expression),
                   TableConstraint'ForeignKey
                     <$> (Token.foreign_ *> Token.key *> parens (commaSep1 Token.identifier))
-                    <*> foreignKeyClause,
+                    <*> foreignKeyClauseParser,
                   TableConstraint'PrimaryKey
                     <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumn))
-                    <*> optional onConflictClause,
+                    <*> optional onConflictParser,
                   TableConstraint'Unique
                     <$> (Token.unique *> parens (commaSep1 indexedColumn))
-                    <*> optional onConflictClause
+                    <*> optional onConflictParser
                 ]
 
 data Default
@@ -554,13 +556,56 @@ makeExpression selectStatement = mdo
         e2
       ]
 
--- | https://sqlite.org/syntax/foreign-key-clause.html
-data ForeignKeyClause
-  = ForeignKeyClause'TODO
-  deriving stock (Eq, Generic, Show)
+foreignKeyClauseParser :: forall r. Parser r ForeignKeyClause
+foreignKeyClauseParser =
+  (\reference (onDelete, onUpdate) deferred -> ForeignKeyClause {reference, onDelete, onUpdate, deferred})
+    <$> (Token.references *> schemaQualified referenceParser)
+    <*> (fromActions <$> many actionClauseParser)
+    <*> deferredParser
+  where
+    fromActions :: [Maybe (Either Action Action)] -> (Action, Action)
+    fromActions =
+      foldr (\x (y, z) -> maybe (y, z) (either (,z) (y,)) x) (Action'NoAction, Action'NoAction)
 
-foreignKeyClause :: Parser r ForeignKeyClause
-foreignKeyClause = undefined
+    actionParser :: Parser r Action
+    actionParser =
+      choice
+        [ Action'Cascade <$ Token.cascade,
+          Action'NoAction <$ (Token.no *> Token.action),
+          Action'Restrict <$ Token.restrict,
+          Action'SetDefault <$ (Token.set *> Token.default_),
+          Action'SetNull <$ (Token.set *> Token.null)
+        ]
+
+    actionClauseParser :: Parser r (Maybe (Either Action Action))
+    actionClauseParser =
+      choice
+        [ Just . Left <$> (Token.on *> Token.delete *> actionParser),
+          Just . Right <$> (Token.on *> Token.update *> actionParser),
+          Nothing <$ (Token.match *> Token.identifier)
+        ]
+
+    deferredParser :: Parser r Bool
+    deferredParser =
+      choice
+        [ f
+            <$> perhaps Token.not
+            <*> (Token.deferrable *> optional (Token.initially *> choice [Token.deferred, Token.immediate])),
+          pure False
+        ]
+      where
+        f :: Bool -> Maybe Token -> Bool
+        f False (Just Token.DEFERRED) = True
+        f _ _ = False
+
+    referenceParser :: Parser r Reference
+    referenceParser =
+      Reference
+        <$> Token.identifier
+        <*> choice
+          [ parens (NonEmpty.toList <$> commaSep1 Token.identifier),
+            pure []
+          ]
 
 functionCallParser :: Parser r (f Expression) -> Parser r (FunctionCall f)
 functionCallParser arguments =
@@ -620,24 +665,24 @@ nullsWhichParser =
     ]
 
 -- | https://sqlite.org/syntax/conflict-clause.html
-data OnConflictClause
-  = OnConflictClause'Abort
-  | OnConflictClause'Fail
-  | OnConflictClause'Ignore
-  | OnConflictClause'Replace
-  | OnConflictClause'Rollback
+data OnConflict
+  = OnConflict'Abort
+  | OnConflict'Fail
+  | OnConflict'Ignore
+  | OnConflict'Replace
+  | OnConflict'Rollback
   deriving stock (Eq, Generic, Show)
 
-onConflictClause :: Parser r OnConflictClause
-onConflictClause =
+onConflictParser :: Parser r OnConflict
+onConflictParser =
   Token.on
     *> Token.conflict
     *> choice
-      [ OnConflictClause'Abort <$ Token.abort,
-        OnConflictClause'Fail <$ Token.fail,
-        OnConflictClause'Ignore <$ Token.ignore,
-        OnConflictClause'Replace <$ Token.replace,
-        OnConflictClause'Rollback <$ Token.rollback
+      [ OnConflict'Abort <$ Token.abort,
+        OnConflict'Fail <$ Token.fail,
+        OnConflict'Ignore <$ Token.ignore,
+        OnConflict'Replace <$ Token.replace,
+        OnConflict'Rollback <$ Token.rollback
       ]
 
 orderingParser :: Parser r Ordering
@@ -872,8 +917,8 @@ data TableAlteration
 data TableConstraint
   = TableConstraint'Check Expression
   | TableConstraint'ForeignKey (NonEmpty Text) ForeignKeyClause
-  | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflictClause)
-  | TableConstraint'Unique (NonEmpty IndexedColumn) (Maybe OnConflictClause)
+  | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflict)
+  | TableConstraint'Unique (NonEmpty IndexedColumn) (Maybe OnConflict)
   deriving stock (Eq, Generic, Show)
 
 data TableDefinition = TableDefinition
