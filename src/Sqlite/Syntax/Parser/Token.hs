@@ -1,6 +1,7 @@
 module Sqlite.Syntax.Parser.Token where
 
 import Data.Text (Text)
+import Numeric.Natural (Natural)
 import Sqlite.Syntax.Token (Token (..))
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
@@ -388,6 +389,12 @@ materialized :: Parser r Token
 materialized =
   Earley.token MATERIALIZED
 
+namedParameter :: Parser r Text
+namedParameter =
+  Earley.terminal \case
+    NamedParameter s -> Just s
+    _ -> Nothing
+
 natural :: Parser r Token
 natural =
   Earley.token NATURAL
@@ -445,6 +452,12 @@ outer =
 over :: Parser r Token
 over =
   Earley.token OVER
+
+parameter :: Parser r (Maybe Natural)
+parameter =
+  Earley.terminal \case
+    Parameter n -> Just n
+    _ -> Nothing
 
 partition :: Parser r Token
 partition =

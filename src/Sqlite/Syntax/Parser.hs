@@ -656,7 +656,8 @@ makeExpression selectStatement windowParser = mdo
     parameterParser :: Parser r Parameter
     parameterParser =
       choice
-        [ Parameter'Named <$> undefined
+        [ Parameter'Named <$> Token.namedParameter,
+          Parameter'Ordinal <$> Token.parameter
         ]
 
 foreignKeyClauseParser :: forall r. Parser r ForeignKeyClause
