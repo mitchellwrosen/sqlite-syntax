@@ -4,6 +4,7 @@ module LexerTests
   )
 where
 
+import Data.Char (isSpace)
 import qualified Data.List as List
 import Data.Maybe
 import Data.Text (Text)
@@ -43,6 +44,11 @@ unitTests = do
 
   -- inside a double-quoted identifier, two double-quotes makes a single double quote
   lex "\"  foo\"\"bar  \"" === Right [Identifier "  foo\"bar  "]
+
+  lex ":foo" === Right [NamedParameter "foo"]
+  lex "$foo" === Right [NamedParameter "foo"]
+  lex "@foo" === Right [NamedParameter "@foo"]
+  lex ":::foo$(bar)" === Right [NamedParameter "::foo$(bar)"]
 
 --
 
@@ -236,7 +242,12 @@ genToken =
       String <$> Gen.text (Range.linear 0 10) Gen.unicode,
       Blob . elongateHexit <$> Gen.text (Range.linear 0 10) Gen.hexit,
       Identifier <$> Gen.element ["foo", "bar", "baz"],
-      Parameter <$> Gen.maybe (Gen.integral (Range.linear 0 10))
+      Parameter <$> Gen.maybe (Gen.integral (Range.linear 0 10)),
+      NamedParameter
+        <$> Gen.frequency
+          [ (9, genParameterName),
+            (1, Text.cons '@' <$> genParameterName)
+          ]
     ]
   where
     genNumber :: Gen Text
@@ -264,6 +275,25 @@ genToken =
         genFractional :: Gen Text
         genFractional =
           Text.cons '.' <$> genDigits
+
+    genParameterName :: Gen Text
+    genParameterName =
+      (\xs mx -> Text.concat (maybe id (\x -> (++ [x])) mx xs))
+        <$> Gen.list (Range.linear 1 3) chunk
+        <*> Gen.maybe suffix
+      where
+        chunk :: Gen Text
+        chunk =
+          Gen.choice
+            [ Gen.text (Range.linear 1 5) Gen.alphaNum,
+              pure "$",
+              pure "::"
+            ]
+
+        suffix :: Gen Text
+        suffix =
+          (\x -> "(" <> x <> ")")
+            <$> Gen.text (Range.linear 0 3) (Gen.filter (\c -> not (isSpace c) && c /= ')') Gen.unicode)
 
     elongateHexit :: Text -> Text
     elongateHexit s =

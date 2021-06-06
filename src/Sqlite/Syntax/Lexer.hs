@@ -5,13 +5,13 @@ module Sqlite.Syntax.Lexer
 where
 
 import Control.Applicative (many, (<|>))
-import Numeric.Natural (Natural)
-import Control.Monad.Combinators (choice)
+import Control.Monad.Combinators (choice, optional)
 import Data.Char
 import Data.Functor
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Read as Text.Read
+import Numeric.Natural (Natural)
 import Sqlite.Syntax.Token (Token (..))
 import TextParser (TextParser)
 import qualified TextParser
@@ -85,8 +85,8 @@ token =
       String <$> string,
       unquotedIdentifier,
       quotedIdentifier,
-      parameter
-      -- TODO named parameter
+      Parameter <$> parameter,
+      NamedParameter <$> namedParameter
     ]
 
 blob :: TextParser Text
@@ -95,9 +95,33 @@ blob = do
   TextParser.commit
   s <- TextParser.takeWhile isHexDigit
   _ <- TextParser.char '\''
+  space
   if even (Text.length s)
-    then s <$ space
+    then pure s
     else fail "invalid hex data"
+
+namedParameter :: TextParser Text
+namedParameter = do
+  s0 <- TextParser.satisfy \c -> c == ':' || c == '@' || c == '$'
+  TextParser.commit
+  s1 <- parameterName
+  space
+  pure (if s0 == '@' then Text.cons s0 s1 else s1)
+  where
+    -- A "parameter name" is defined to be a sequence of one or more characters that consists of ALPHANUMERIC characters
+    -- and/or dollar-signs (u0025) intermixed with pairs of colons (u003a) and optionally followed by any sequence of
+    -- non-zero, non-WHITESPACE characters enclosed in parentheses (u0028 and u0029).
+    parameterName :: TextParser Text
+    parameterName = do
+      chunks <- many (TextParser.takeWhile1 isAlphaNum <|> TextParser.string "$" <|> TextParser.string "::")
+      maybeSuffix <-
+        optional do
+          c0 <- TextParser.string "("
+          TextParser.commit
+          c1 <- TextParser.takeWhile (\c -> not (isSpace c) && c /= ')')
+          c2 <- TextParser.string ")"
+          pure (Text.concat [c0, c1, c2])
+      pure (Text.concat (maybe id (\suffix -> (++ [suffix])) maybeSuffix chunks))
 
 number :: TextParser Text
 number =
@@ -146,18 +170,16 @@ number =
         sign =
           Text.singleton <$> TextParser.satisfy \c -> c == '+' || c == '-'
 
-parameter :: TextParser Token
+parameter :: TextParser (Maybe Natural)
 parameter = do
   _ <- TextParser.char '?'
   TextParser.commit
   digits <- TextParser.takeWhile isDigit
   space
-  let n :: Maybe Natural
-      n =
-        case Text.Read.decimal digits of
-          Left _ -> Nothing
-          Right (n0, _) -> Just n0
-  pure (Parameter n)
+  pure do
+    case Text.Read.decimal digits of
+      Left _ -> Nothing
+      Right (n0, _) -> Just n0
 
 quotedIdentifier :: TextParser Token
 quotedIdentifier = do

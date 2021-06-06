@@ -126,6 +126,7 @@ data Token
   | NOTNULL -- ^ @NOTNULL@
   | NULL -- ^ @NULL@
   | NULLS -- ^ @NULLS@
+  | NamedParameter Text -- ^ @:AAAA@
   -- TODO split into integer/real
   | Number Text -- ^ Numeric literal
   | OF -- ^ @OF@
@@ -312,6 +313,11 @@ render = \case
   NOTNULL -> "NOTNULL"
   NULL -> "NULL"
   NULLS -> "NULLS"
+  NamedParameter s ->
+    let s' = Text.Builder.fromText s
+     in if Text.head s == '@'
+          then s'
+          else ":" <> s'
   Number s -> Text.Builder.fromText s
   OF -> "OF"
   OFFSET -> "OFFSET"
