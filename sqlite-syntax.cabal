@@ -63,11 +63,10 @@ library
     Sqlite.Syntax.Internal.Type.FunctionCall
     Sqlite.Syntax.Internal.Type.LiteralValue
     Sqlite.Syntax.Internal.Type.Named
+    Sqlite.Syntax.Internal.Type.Namespaced
     Sqlite.Syntax.Internal.Type.OrderingTerm
     Sqlite.Syntax.Internal.Type.QualifiedTableName
-    Sqlite.Syntax.Internal.Type.SchemaQualified
     Sqlite.Syntax.Internal.Type.SelectStatement
-    Sqlite.Syntax.Internal.Type.TableQualified
     Sqlite.Syntax.Internal.Type.Window
     Sqlite.Syntax.Parser.Token
     TextParser

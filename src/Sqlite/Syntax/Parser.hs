@@ -17,11 +17,10 @@ import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
+import Sqlite.Syntax.Internal.Type.Namespaced
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
-import Sqlite.Syntax.Internal.Type.SchemaQualified
 import Sqlite.Syntax.Internal.Type.SelectStatement
-import Sqlite.Syntax.Internal.Type.TableQualified
 import Sqlite.Syntax.Internal.Type.Window
 import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
@@ -274,7 +273,7 @@ data TODO = TODO
 
 -- | https://sqlite.org/lang_altertable.html
 data AlterTableStatement = AlterTableStatement
-  { table :: SchemaQualified Text,
+  { table :: Namespaced Text Text,
     alteration :: TableAlteration
   }
   deriving stock (Eq, Generic, Show)
@@ -282,7 +281,7 @@ data AlterTableStatement = AlterTableStatement
 makeAlterTableStatement :: Rule r ColumnDefinition -> Rule r AlterTableStatement
 makeAlterTableStatement columnDefinition =
   AlterTableStatement
-    <$> (Token.alter *> Token.table *> schemaQualified Token.identifier)
+    <$> (Token.alter *> Token.table *> namespaced Token.identifier Token.identifier)
     <*> choice
       [ TableAlteration'AddColumn <$> columnDefinition,
         TableAlteration'DropColumn <$> Token.identifier,
@@ -294,12 +293,12 @@ makeAlterTableStatement columnDefinition =
 
 -- | https://sqlite.org/lang_analyze.html
 data AnalyzeStatement
-  = AnalyzeStatement (Maybe (SchemaQualified Text))
+  = AnalyzeStatement (Maybe (Namespaced Text Text))
   deriving stock (Eq, Generic, Show)
 
 analyzeStatement :: Rule r AnalyzeStatement
 analyzeStatement =
-  AnalyzeStatement <$> (Token.analyze *> optional (schemaQualified Token.identifier))
+  AnalyzeStatement <$> (Token.analyze *> optional (namespaced Token.identifier Token.identifier))
 
 -- | https://sqlite.org/syntax/attach-stmt.html
 data AttachStatement = AttachStatement
@@ -371,7 +370,7 @@ makeColumnDefinitionParser expressionParser =
 data CreateIndexStatement = CreateIndexStatement
   { unique :: Bool,
     ifNotExists :: Bool,
-    name :: SchemaQualified Text,
+    name :: Namespaced Text Text,
     table :: Text,
     columns :: NonEmpty IndexedColumn,
     where_ :: Maybe Expression
@@ -383,7 +382,7 @@ makeCreateIndexStatement expression indexedColumn =
   CreateIndexStatement
     <$> (Token.create *> perhaps Token.unique)
     <*> (Token.index *> perhaps (Token.if_ *> Token.not *> Token.exists))
-    <*> schemaQualified Token.identifier
+    <*> namespaced Token.identifier Token.identifier
     <*> (Token.on *> Token.identifier)
     <*> parens (commaSep1 indexedColumn)
     <*> optional (Token.where_ *> expression)
@@ -392,7 +391,7 @@ makeCreateIndexStatement expression indexedColumn =
 data CreateTableStatement = CreateTableStatement
   { temporary :: Bool,
     ifNotExists :: Bool,
-    name :: SchemaQualified Text,
+    name :: Namespaced Text Text,
     definition :: Either SelectStatement TableDefinition
   }
   deriving stock (Eq, Generic, Show)
@@ -408,7 +407,7 @@ makeCreateTableStatement columnDefinition expression indexedColumn selectStateme
   CreateTableStatement
     <$> (Token.create *> perhaps (choice [Token.temp, Token.temporary]))
     <*> (Token.table *> perhaps (Token.if_ *> Token.not *> Token.exists))
-    <*> schemaQualified Token.identifier
+    <*> namespaced Token.identifier Token.identifier
     <*> choice
       [ Left <$> (Token.as *> selectStatement),
         Right <$> tableDefinitionParser
@@ -491,7 +490,7 @@ makeExpression selectStatement windowParser = mdo
                     <$> (Token.cast *> Token.leftParenthesis *> expression)
                     <*> (Token.as *> Token.identifier)
                 ),
-          Expression'Column <$> schemaQualified (tableQualified Token.identifier),
+          Expression'Column <$> namespaced (namespaced Token.identifier Token.identifier) Token.identifier,
           Expression'Exists <$> (Token.exists *> parens selectStatement),
           Expression'FunctionCall <$> simpleFunctionCallParser,
           Expression'LiteralValue <$> literalValueRule,
@@ -566,7 +565,7 @@ makeExpression selectStatement windowParser = mdo
         (\x0 not_ x1 -> (if not_ then Expression'Not else id) (Expression'InTable (InTableExpression x0 x1)))
           <$> e1
           <*> perhaps Token.not
-          <*> (Token.in_ *> schemaQualified Token.identifier),
+          <*> (Token.in_ *> namespaced Token.identifier Token.identifier),
         (\x0 not_ x1 -> (if not_ then Expression'Not else id) (Expression'InValues (InValuesExpression x0 x1)))
           <$> e1
           <*> perhaps Token.not
@@ -667,7 +666,7 @@ makeExpression selectStatement windowParser = mdo
 foreignKeyClauseParser :: forall r. Rule r ForeignKeyClause
 foreignKeyClauseParser =
   (\reference (onDelete, onUpdate) deferred -> ForeignKeyClause {reference, onDelete, onUpdate, deferred})
-    <$> (Token.references *> schemaQualified referenceParser)
+    <$> (Token.references *> namespaced Token.identifier referenceParser)
     <*> (fromActions <$> many actionClauseParser)
     <*> deferredParser
   where
@@ -718,7 +717,7 @@ foreignKeyClauseParser =
 functionCallParser :: Rule r (f Expression) -> Rule r (FunctionCall f)
 functionCallParser arguments =
   FunctionCall
-    <$> schemaQualified Token.identifier
+    <$> namespaced Token.identifier Token.identifier
     <*> parens arguments
 
 data GeneratedType
@@ -764,6 +763,12 @@ literalValueRule =
       LiteralValue'Number <$> Token.number
       -- LiteralValue'String <$> Token.string
     ]
+
+namespaced :: Rule r a -> Rule r b -> Rule r (Namespaced a b)
+namespaced p1 p2 =
+  Namespaced
+    <$> optional (p1 <* Token.fullStop)
+    <*> p2
 
 nullsWhichParser :: Rule r NullsWhich
 nullsWhichParser =
@@ -828,12 +833,6 @@ data ReturningClauseItem
 
 makeReturningClauseItem :: Rule r Expression -> Rule r ReturningClauseItem
 makeReturningClauseItem = undefined
-
-schemaQualified :: Rule r a -> Rule r (SchemaQualified a)
-schemaQualified p =
-  SchemaQualified
-    <$> optional (Token.identifier <* Token.fullStop)
-    <*> p
 
 makeSelectStatementParser ::
   forall r.
@@ -911,7 +910,7 @@ makeSelectStatementParser expressionParser orderingTermParser windowParser = mdo
         Earley.rule do
           Select
             <$> distinctParser
-            <*> commaSep1 (schemaQualified (tableQualified Token.identifier))
+            <*> commaSep1 (namespaced (namespaced Token.identifier Token.identifier) Token.identifier)
             <*> optional (Token.from *> tableParser)
             <*> optional (Token.where_ *> expressionParser)
             <*> optional groupByClauseParser
@@ -997,7 +996,7 @@ makeSelectStatementParser expressionParser orderingTermParser windowParser = mdo
         qualifiedTableNameParser =
           QualifiedTableName
             <$> ( Aliased
-                    <$> schemaQualified Token.identifier
+                    <$> namespaced Token.identifier Token.identifier
                     <*> optional (Token.as *> Token.identifier)
                 )
             <*> optional indexedByParser
@@ -1052,12 +1051,6 @@ data TableDefinition = TableDefinition
     withoutRowid :: Bool
   }
   deriving stock (Eq, Generic, Show)
-
-tableQualified :: Rule r a -> Rule r (TableQualified a)
-tableQualified p =
-  TableQualified
-    <$> optional (Token.identifier <* Token.fullStop)
-    <*> p
 
 data TransactionType
   = TransactionType'Deferred

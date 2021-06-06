@@ -7,10 +7,9 @@ import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Aliased (Aliased)
 import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.FunctionCall
+import Sqlite.Syntax.Internal.Type.Namespaced
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
-import Sqlite.Syntax.Internal.Type.SchemaQualified
-import Sqlite.Syntax.Internal.Type.TableQualified
 import Sqlite.Syntax.Internal.Type.Window
 import Prelude hiding (Ordering, fail, not, null)
 
@@ -63,7 +62,7 @@ data LimitClause = LimitClause
 data Select = Select
   { -- | @DISTINCT@
     distinct :: Bool,
-    columns :: NonEmpty (SchemaQualified (TableQualified Text)),
+    columns :: NonEmpty (Namespaced (Namespaced Text Text) Text),
     -- | @FROM ...@
     from :: Maybe Table,
     -- | @WHERE ...@

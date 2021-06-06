@@ -6,11 +6,11 @@ where
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression (Expression)
-import Sqlite.Syntax.Internal.Type.SchemaQualified (SchemaQualified)
+import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Prelude
 
 data FunctionCall f = FunctionCall
-  { name :: SchemaQualified Text,
+  { name :: Namespaced Text Text,
     arguments :: f Expression
   }
   deriving stock (Generic)

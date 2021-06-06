@@ -6,9 +6,8 @@ import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 import Sqlite.Syntax.Internal.Type.FunctionCall (FunctionCall)
 import Sqlite.Syntax.Internal.Type.LiteralValue (LiteralValue)
-import Sqlite.Syntax.Internal.Type.SchemaQualified (SchemaQualified)
+import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
-import Sqlite.Syntax.Internal.Type.TableQualified (TableQualified)
 import Sqlite.Syntax.Internal.Type.Window (Window)
 import Prelude hiding (Ordering, fail, not, null)
 
@@ -65,7 +64,7 @@ data Expression
   | -- | @... COLLATE ...@
     Expression'Collate CollateExpression
   | -- | @ [[schema.]table.]column@
-    Expression'Column (SchemaQualified (TableQualified Text))
+    Expression'Column (Namespaced (Namespaced Text Text) Text)
   | -- | @... || ...@
     Expression'Concatenate Expression Expression
   | -- | @... / ...@
@@ -135,7 +134,7 @@ data InSubqueryExpression = InSubqueryExpression
 
 data InTableExpression = InTableExpression
   { expression :: Expression,
-    table :: SchemaQualified Text
+    table :: Namespaced Text Text
   }
   deriving stock (Eq, Generic, Show)
 

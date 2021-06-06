@@ -34,7 +34,7 @@ genExpression :: Gen Expression
 genExpression =
   Gen.recursive
     Gen.choice
-    [ Expression'Column <$> genSchemaQualified (genTableQualified genIdentifier),
+    [ Expression'Column <$> genNamespaced (genNamespaced genIdentifier genIdentifier) genIdentifier,
       Expression'LiteralValue <$> genLiteralValue,
       Expression'Parameter <$> genParameter,
       Expression'Raise <$> genRaise
@@ -60,7 +60,8 @@ genExpression =
       Gen.subtermM genExpression \expression ->
         (\subquery -> Expression'InSubquery (InSubqueryExpression expression subquery)) <$> genSelectStatement,
       Gen.subtermM genExpression \expression ->
-        (\table -> Expression'InTable (InTableExpression expression table)) <$> genSchemaQualified genIdentifier,
+        (\table -> Expression'InTable (InTableExpression expression table))
+          <$> genNamespaced genIdentifier genIdentifier,
       Gen.subtermM genExpression \expression ->
         (\values -> Expression'InValues (InValuesExpression expression values))
           <$> Gen.list (Range.linear 0 5) genExpression,
@@ -100,7 +101,7 @@ genFunctionArguments =
 genFunctionCall :: Gen (f Expression) -> Gen (FunctionCall f)
 genFunctionCall gen =
   FunctionCall
-    <$> genSchemaQualified genIdentifier
+    <$> genNamespaced genIdentifier genIdentifier
     <*> gen
 
 genGroupByClause :: Gen GroupByClause
@@ -127,6 +128,10 @@ genIdentifier :: Gen Text
 genIdentifier =
   Gen.element ["foo", "bar", "baz"]
 
+genNamespaced :: Gen a -> Gen b -> Gen (Namespaced a b)
+genNamespaced g1 g2 =
+  Namespaced <$> Gen.maybe g1 <*> g2
+
 genParameter :: Gen Parameter
 genParameter = undefined
 
@@ -139,15 +144,11 @@ genRaise =
       Raise'Rollback "error"
     ]
 
-genSchemaQualified :: Gen a -> Gen (SchemaQualified a)
-genSchemaQualified gen =
-  SchemaQualified <$> Gen.maybe genIdentifier <*> gen
-
 genSelect :: Gen Select
 genSelect =
   Select
     <$> Gen.bool
-    <*> Gen.nonEmpty (Range.linear 1 5) (genSchemaQualified (genTableQualified genIdentifier))
+    <*> Gen.nonEmpty (Range.linear 1 5) (genNamespaced (genNamespaced genIdentifier genIdentifier) genIdentifier)
     <*> Gen.maybe genTable
     <*> Gen.maybe genExpression
     <*> Gen.maybe genGroupByClause
@@ -161,10 +162,6 @@ genSelectStatement = undefined
 
 genTable :: Gen Table
 genTable = undefined
-
-genTableQualified :: Gen a -> Gen (TableQualified a)
-genTableQualified gen =
-  TableQualified <$> Gen.maybe genIdentifier <*> gen
 
 genWindowFunctionCall :: Gen WindowFunctionCall
 genWindowFunctionCall = undefined

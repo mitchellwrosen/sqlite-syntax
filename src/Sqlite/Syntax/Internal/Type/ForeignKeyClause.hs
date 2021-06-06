@@ -7,7 +7,7 @@ where
 
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import Sqlite.Syntax.Internal.Type.SchemaQualified
+import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Prelude
 
 data Action
@@ -26,7 +26,7 @@ data Action
 -- | https://sqlite.org/syntax/foreign-key-clause.html
 -- TODO rename?
 data ForeignKeyClause = ForeignKeyClause
-  { reference :: SchemaQualified Reference,
+  { reference :: Namespaced Text Reference,
     onDelete :: Action,
     onUpdate :: Action,
     deferred :: Bool

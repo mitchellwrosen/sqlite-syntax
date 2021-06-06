@@ -7,7 +7,7 @@ where
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Aliased
-import Sqlite.Syntax.Internal.Type.SchemaQualified
+import Sqlite.Syntax.Internal.Type.Namespaced
 import Prelude
 
 data IndexedBy
@@ -17,7 +17,7 @@ data IndexedBy
 
 -- | https://sqlite.org/syntax/qualified-table-name.html
 data QualifiedTableName = QualifiedTableName
-  { name :: Aliased Maybe (SchemaQualified Text),
+  { name :: Aliased Maybe (Namespaced Text Text),
     indexedBy :: Maybe IndexedBy
   }
   deriving stock (Eq, Generic, Show)

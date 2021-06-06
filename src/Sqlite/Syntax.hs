@@ -20,15 +20,14 @@ module Sqlite.Syntax
     InValuesExpression (..),
     LiteralValue (..),
     Named (..),
+    Namespaced (..),
     Parameter (..),
     Raise (..),
     RowValue (..),
-    SchemaQualified (..),
     Select (..),
     SelectCore (..),
     SelectStatement (..),
     Table (..),
-    TableQualified (..),
     Window (..),
     WindowFunctionCall (..),
   )
@@ -40,7 +39,6 @@ import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
-import Sqlite.Syntax.Internal.Type.SchemaQualified
+import Sqlite.Syntax.Internal.Type.Namespaced
 import Sqlite.Syntax.Internal.Type.SelectStatement
-import Sqlite.Syntax.Internal.Type.TableQualified
 import Sqlite.Syntax.Internal.Type.Window
