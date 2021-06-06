@@ -160,7 +160,6 @@ data Token
   | RIGHT -- ^ @RIGHT@
   | ROLLBACK -- ^ @ROLLBACK@
   | ROW -- ^ @ROW@
-  | ROWID -- ^ @ROWID@
   | ROWS -- ^ @ROWS@
   | RightParenthesis -- ^ @)@
   | SAVEPOINT -- ^ @SAVEPOINT@
@@ -350,7 +349,6 @@ render = \case
   RIGHT -> "RIGHT"
   ROLLBACK -> "ROLLBACK"
   ROW -> "ROW"
-  ROWID -> "ROWID"
   ROWS -> "ROWS"
   RightParenthesis -> ")"
   SAVEPOINT -> "SAVEPOINT"

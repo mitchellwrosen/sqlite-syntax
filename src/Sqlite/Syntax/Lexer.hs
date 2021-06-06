@@ -334,7 +334,6 @@ unquotedIdentifier = do
       | s' == "returning" = pure RETURNING
       | s' == "right" = pure RIGHT
       | s' == "rollback" = pure ROLLBACK
-      | s' == "rowid" = pure ROWID
       | s' == "rows" = pure ROWS
       | s' == "row" = pure ROW
       | s' == "savepoint" = pure SAVEPOINT

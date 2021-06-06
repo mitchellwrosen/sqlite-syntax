@@ -203,7 +203,6 @@ genToken =
       pure RIGHT,
       pure ROLLBACK,
       pure ROW,
-      pure ROWID,
       pure ROWS,
       pure RightParenthesis,
       pure SAVEPOINT,

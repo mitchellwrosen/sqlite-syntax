@@ -56,6 +56,7 @@ library
     Sqlite.Syntax.Token
   hs-source-dirs: src
   other-modules:
+    Sqlite.Syntax.Internal.Parser.Utils
     Sqlite.Syntax.Internal.Type.Aliased
     Sqlite.Syntax.Internal.Type.Expression
     Sqlite.Syntax.Internal.Type.ForeignKeyClause
@@ -76,6 +77,7 @@ test-suite tests
   build-depends:
     directory,
     hedgehog,
+    pretty-simple,
     sqlite-syntax,
   hs-source-dirs: test
   main-is: Test.hs
