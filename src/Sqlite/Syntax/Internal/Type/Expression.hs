@@ -8,6 +8,7 @@ import Sqlite.Syntax.Internal.Type.LiteralValue (LiteralValue)
 import Sqlite.Syntax.Internal.Type.SchemaQualified (SchemaQualified)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
 import Sqlite.Syntax.Internal.Type.TableQualified (TableQualified)
+import Sqlite.Syntax.Internal.Type.Window (Window)
 import Prelude hiding (Ordering, fail, not, null)
 
 data AggregateFunctionCall = AggregateFunctionCall
@@ -153,7 +154,7 @@ data AggregateFunctionArguments expression
 
 -- TODO move this
 data OverClause
-  = OverClause'WindowDefinition WindowDefinition
+  = OverClause'Window Window
   | OverClause'WindowName Text
   deriving stock (Eq, Generic, Show)
 
@@ -169,11 +170,6 @@ data Raise
 -- TODO move this
 data RowValue
   = RowValue Expression Expression [Expression]
-  deriving stock (Eq, Generic, Show)
-
--- TODO move this
-data WindowDefinition
-  = WindowDefinition'TODO
   deriving stock (Eq, Generic, Show)
 
 data WindowFunctionCall = WindowFunctionCall

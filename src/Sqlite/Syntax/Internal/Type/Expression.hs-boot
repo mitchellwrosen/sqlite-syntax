@@ -5,8 +5,3 @@ import Prelude
 data Expression
 instance Eq Expression
 instance Show Expression
-
--- TODO move this
-data WindowDefinition
-instance Eq WindowDefinition
-instance Show WindowDefinition

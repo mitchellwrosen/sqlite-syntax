@@ -11,6 +11,7 @@ import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.SchemaQualified
 import Sqlite.Syntax.Internal.Type.TableQualified
+import Sqlite.Syntax.Internal.Type.Window
 import Prelude hiding (Ordering, fail, not, null)
 
 -- | https://sqlite.org/syntax/common-table-expression.html
@@ -69,7 +70,7 @@ data Select = Select
     where_ :: Maybe Expression,
     -- | @GROUP BY ...@
     groupBy :: Maybe GroupByClause,
-    window :: Maybe (NonEmpty (Aliased Identity WindowDefinition))
+    window :: Maybe (NonEmpty (Aliased Identity Window))
   }
   deriving stock (Eq, Generic, Show)
 

@@ -22,6 +22,7 @@ import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.SchemaQualified
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.TableQualified
+import Sqlite.Syntax.Internal.Type.Window
 import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Sqlite.Syntax.Token (Token)
@@ -33,6 +34,9 @@ import Prelude hiding (Ordering, fail, lex, not, null)
 -- TODO move signed-number to lexer probably
 -- TODO name things *Parser
 -- TODO does 'many' need to be 'rule'd?
+-- TODO eliminate Maybes by using the defaults
+-- TODO make sure all of the make* things called multiple times aren't involved in mutual recursion
+-- TODO rm *Clause
 
 --
 
@@ -106,13 +110,20 @@ data Statement
 data TODO = TODO
   deriving stock (Eq, Generic, Show)
 
-statementParser :: Earley.Grammar r (Parser r Statement)
+statementParser :: forall r. Earley.Grammar r (Parser r Statement)
 statementParser = mdo
   columnDefinitionParser <- Earley.rule (makeColumnDefinitionParser expressionParser)
-  expressionParser <- makeExpression selectStatementParser
+  expressionParser <- makeExpression selectStatementParser windowParser
   indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
+  orderingTermParser <- Earley.rule (makeOrderingTermParser expressionParser)
   qualifiedTableNameParser <- Earley.rule undefined
-  selectStatementParser <- makeSelectStatementParser expressionParser qualifiedTableNameParser
+  selectStatementParser <-
+    makeSelectStatementParser
+      expressionParser
+      orderingTermParser
+      qualifiedTableNameParser
+      windowParser
+  windowParser <- Earley.rule (makeWindowParser expressionParser orderingTermParser)
 
   let alterTableStatement = makeAlterTableStatement columnDefinitionParser
       attachStatement = makeAttachStatement expressionParser
@@ -165,12 +176,97 @@ statementParser = mdo
         Statement'Update <$> pure TODO,
         Statement'Vacuum <$> pure TODO
       ]
+  where
+    makeOrderingTermParser :: Parser r Expression -> Parser r OrderingTerm
+    makeOrderingTermParser expressionParser =
+      OrderingTerm
+        <$> expressionParser
+        <*> optional (Token.collate *> Token.identifier)
+        <*> orderingParser
+        <*> optional nullsWhichParser
+
+    makeWindowParser :: Parser r Expression -> Parser r OrderingTerm -> Parser r Window
+    makeWindowParser expressionParser orderingTermParser =
+      parens do
+        Window
+          <$> optional Token.identifier
+          <*> optional (Token.partition *> Token.by *> commaSep1 expressionParser)
+          <*> optional (Token.order *> Token.by *> commaSep1 orderingTermParser)
+          <*> choice [frameParser, pure defaultFrame]
+      where
+        defaultFrame :: Frame
+        defaultFrame =
+          Frame FrameType'Range (FrameBoundary'Preceding Nothing) FrameBoundary'CurrentRow FrameExclude'NoOthers
+
+        frameParser :: Parser r Frame
+        frameParser =
+          ( \type_ (startingBoundary, endingBoundary) exclude ->
+              Frame {type_, startingBoundary, endingBoundary, exclude}
+          )
+            <$> choice
+              [ FrameType'Groups <$ Token.groups,
+                FrameType'Range <$ Token.range,
+                FrameType'Rows <$ Token.rows
+              ]
+            <*> frameBoundariesParser
+            <*> frameExcludeParser
+          where
+            frameBoundariesParser :: Parser r (FrameBoundary Identity Maybe, FrameBoundary Maybe Identity)
+            frameBoundariesParser =
+              choice
+                [ (,)
+                    <$> ( Token.between
+                            *> choice
+                              [ currentRowParser,
+                                exprFollowingParser Identity,
+                                unboundedPrecedingParser,
+                                exprPrecedingParser Just
+                              ]
+                        )
+                    <*> ( Token.and
+                            *> choice
+                              [ currentRowParser,
+                                exprFollowingParser Just,
+                                unboundedFollowingParser,
+                                exprPrecedingParser Identity
+                              ]
+                        ),
+                  (,FrameBoundary'CurrentRow) <$> currentRowParser,
+                  (,FrameBoundary'CurrentRow) <$> unboundedPrecedingParser,
+                  (,FrameBoundary'CurrentRow) <$> exprPrecedingParser Just
+                ]
+              where
+                currentRowParser :: Parser r (FrameBoundary f g)
+                currentRowParser =
+                  FrameBoundary'CurrentRow <$ (Token.current *> Token.row)
+
+                exprFollowingParser :: (Expression -> f Expression) -> Parser r (FrameBoundary f g)
+                exprFollowingParser f =
+                  (FrameBoundary'Following . f) <$> (expressionParser <* Token.following)
+
+                exprPrecedingParser :: (Expression -> g Expression) -> Parser r (FrameBoundary f g)
+                exprPrecedingParser f =
+                  (FrameBoundary'Preceding . f) <$> (expressionParser <* Token.preceding)
+
+                unboundedFollowingParser :: Parser r (FrameBoundary Maybe g)
+                unboundedFollowingParser =
+                  FrameBoundary'Following Nothing <$ (Token.unbounded *> Token.following)
+
+                unboundedPrecedingParser :: Parser r (FrameBoundary f Maybe)
+                unboundedPrecedingParser =
+                  FrameBoundary'Preceding Nothing <$ (Token.unbounded *> Token.preceding)
+
+            frameExcludeParser :: Parser r FrameExclude
+            frameExcludeParser =
+              choice
+                [ FrameExclude'CurrentRow <$ (Token.exclude *> Token.current *> Token.row),
+                  FrameExclude'Group <$ (Token.exclude *> Token.group),
+                  FrameExclude'NoOthers <$ (Token.exclude *> Token.no *> Token.others),
+                  FrameExclude'Ties <$ (Token.exclude *> Token.ties),
+                  pure FrameExclude'NoOthers
+                ]
 
 --
-
--- aliasedParser :: Parser r a -> Parser r (Aliased a)
--- aliasedParser parser =
---   Aliased <$> parser <*> optional (Token.as *> Token.identifier)
 
 -- | https://sqlite.org/lang_altertable.html
 data AlterTableStatement = AlterTableStatement
@@ -356,8 +452,8 @@ runG :: (forall r. Earley.Grammar r (Parser r a)) -> [Token] -> [a]
 runG parser tokens =
   fst (Earley.fullParses (Earley.parser parser) tokens)
 
-makeExpression :: Parser r SelectStatement -> Earley.Grammar r (Parser r Expression)
-makeExpression selectStatement = mdo
+makeExpression :: Parser r SelectStatement -> Parser r Window -> Earley.Grammar r (Parser r Expression)
+makeExpression selectStatement windowParser = mdo
   filterClauseParser <- Earley.rule (Token.filter *> parens (Token.where_ *> expression))
 
   expression <-
@@ -424,7 +520,12 @@ makeExpression selectStatement = mdo
             <$> ( WindowFunctionCall
                     <$> simpleFunctionCallParser
                     <*> optional filterClauseParser
-                    <*> overClauseParser
+                    <*> ( Token.over
+                            *> choice
+                              [ OverClause'Window <$> windowParser,
+                                OverClause'WindowName <$> Token.identifier
+                              ]
+                        )
                 ),
           parens expression
         ]
@@ -693,22 +794,6 @@ orderingParser =
       Ordering'Desc <$ Token.desc
     ]
 
-makeOrderingTermParser :: Parser r Expression -> Parser r OrderingTerm
-makeOrderingTermParser expressionParser =
-  OrderingTerm
-    <$> expressionParser
-    <*> optional (Token.collate *> Token.identifier)
-    <*> orderingParser
-    <*> optional nullsWhichParser
-
-overClauseParser :: Parser r OverClause
-overClauseParser =
-  Token.over
-    *> choice
-      [ OverClause'WindowDefinition <$> windowDefinitionParser,
-        OverClause'WindowName <$> Token.identifier
-      ]
-
 raiseParser :: Parser r Raise
 raiseParser =
   Token.raise *> parens (choice xs)
@@ -747,9 +832,11 @@ schemaQualified p =
 makeSelectStatementParser ::
   forall r.
   Parser r Expression ->
+  Parser r OrderingTerm ->
   Parser r QualifiedTableName ->
+  Parser r Window ->
   Earley.Grammar r (Parser r SelectStatement)
-makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
+makeSelectStatementParser expressionParser orderingTermParser qualifiedTableNameParser windowParser = mdo
   commonTableExpressionParser <- Earley.rule (makeCommonTableExpressionParser selectStatementParser)
   compoundSelectParser <- makeCompoundSelectParser tableParser
   selectStatementParser <-
@@ -757,7 +844,7 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
       SelectStatement
         <$> optional (WithClause <$> (Token.with *> perhaps Token.recursive) <*> commaSep1 commonTableExpressionParser)
         <*> compoundSelectParser
-        <*> optional (Token.order *> Token.by *> commaSep1 (makeOrderingTermParser expressionParser))
+        <*> optional (Token.order *> Token.by *> commaSep1 orderingTermParser)
         <*> optional limitClauseParser
   tableParser <- makeTableParser selectStatementParser
   pure selectStatementParser
@@ -818,21 +905,11 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
       selectParser <-
         Earley.rule do
           Select
-            <$> ( Token.select
-                    *> choice
-                      [ True <$ Token.distinct,
-                        False <$ Token.all,
-                        pure False
-                      ]
-                )
+            <$> distinctParser
             <*> commaSep1 (schemaQualified (tableQualified Token.identifier))
             <*> optional (Token.from *> tableParser)
             <*> optional (Token.where_ *> expressionParser)
-            <*> optional
-              ( GroupByClause
-                  <$> (Token.group *> Token.by *> commaSep1 expressionParser)
-                  <*> optional (Token.having *> expressionParser)
-              )
+            <*> optional groupByClauseParser
             <*> optional windowClauseParser
       selectCoreParser <-
         Earley.rule do
@@ -843,13 +920,26 @@ makeSelectStatementParser expressionParser qualifiedTableNameParser = mdo
       valuesParser <- Earley.rule (Token.values *> commaSep1 (parens (commaSep1 expressionParser)))
       pure compoundSelectParser
       where
-        windowClauseParser :: Parser r (NonEmpty (Aliased Identity WindowDefinition))
+        distinctParser :: Parser r Bool
+        distinctParser =
+          Token.select
+            *> choice
+              [ True <$ Token.distinct,
+                False <$ Token.all,
+                pure False
+              ]
+        groupByClauseParser :: Parser r GroupByClause
+        groupByClauseParser =
+          GroupByClause
+            <$> (Token.group *> Token.by *> commaSep1 expressionParser)
+            <*> optional (Token.having *> expressionParser)
+        windowClauseParser :: Parser r (NonEmpty (Aliased Identity Window))
         windowClauseParser =
           Token.window
             *> commaSep1
               ( (\x y -> Aliased y (Identity x))
                   <$> Token.identifier
-                  <*> (Token.as *> windowDefinitionParser)
+                  <*> (Token.as *> windowParser)
               )
 
     makeTableParser :: Parser r SelectStatement -> Earley.Grammar r (Parser r Table)
@@ -953,6 +1043,3 @@ data TransactionType
   | TransactionType'Exclusive
   | TransactionType'Immediate
   deriving stock (Eq, Generic, Show)
-
-windowDefinitionParser :: Parser r WindowDefinition
-windowDefinitionParser = undefined

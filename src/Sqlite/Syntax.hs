@@ -1,15 +1,46 @@
 module Sqlite.Syntax
-  ( module X,
+  ( Aliased (..),
+    AggregateFunctionArguments (..),
+    AggregateFunctionCall (..),
+    BindParameter (..),
+    CaseExpression (..),
+    CastExpression (..),
+    CollateExpression (..),
+    Expression (..),
+    ForeignKeyClause (..),
+    Frame (..),
+    FrameBoundary (..),
+    FrameExclude (..),
+    FrameType (..),
+    FunctionArguments (..),
+    FunctionCall (..),
+    GroupByClause (..),
+    InFunctionExpression (..),
+    InSubqueryExpression (..),
+    InTableExpression (..),
+    InValuesExpression (..),
+    LiteralValue (..),
+    Named (..),
+    Raise (..),
+    RowValue (..),
+    SchemaQualified (..),
+    Select (..),
+    SelectCore (..),
+    SelectStatement (..),
+    Table (..),
+    TableQualified (..),
+    Window (..),
+    WindowFunctionCall (..),
   )
 where
 
--- TODO make sure this is exhaustive
-import Sqlite.Syntax.Internal.Type.Aliased as X
-import Sqlite.Syntax.Internal.Type.Expression as X
-import Sqlite.Syntax.Internal.Type.ForeignKeyClause as X
-import Sqlite.Syntax.Internal.Type.FunctionCall as X
-import Sqlite.Syntax.Internal.Type.LiteralValue as X
-import Sqlite.Syntax.Internal.Type.Named as X
-import Sqlite.Syntax.Internal.Type.SchemaQualified as X
-import Sqlite.Syntax.Internal.Type.SelectStatement as X
-import Sqlite.Syntax.Internal.Type.TableQualified as X
+import Sqlite.Syntax.Internal.Type.Aliased
+import Sqlite.Syntax.Internal.Type.Expression
+import Sqlite.Syntax.Internal.Type.ForeignKeyClause
+import Sqlite.Syntax.Internal.Type.FunctionCall
+import Sqlite.Syntax.Internal.Type.LiteralValue
+import Sqlite.Syntax.Internal.Type.Named
+import Sqlite.Syntax.Internal.Type.SchemaQualified
+import Sqlite.Syntax.Internal.Type.SelectStatement
+import Sqlite.Syntax.Internal.Type.TableQualified
+import Sqlite.Syntax.Internal.Type.Window

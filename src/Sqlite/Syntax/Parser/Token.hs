@@ -130,6 +130,10 @@ cross :: Parser r Token
 cross =
   Earley.token CROSS
 
+current :: Parser r Token
+current =
+  Earley.token CURRENT
+
 currentDate :: Parser r Token
 currentDate =
   Earley.token CURRENT_DATE
@@ -202,6 +206,10 @@ exclamationMarkEqualsSign :: Parser r Token
 exclamationMarkEqualsSign =
   Earley.token ExclamationMarkEqualsSign
 
+exclude :: Parser r Token
+exclude =
+  Earley.token EXCLUDE
+
 exclusive :: Parser r Token
 exclusive =
   Earley.token EXCLUSIVE
@@ -225,6 +233,10 @@ filter =
 first :: Parser r Token
 first =
   Earley.token FIRST
+
+following :: Parser r Token
+following =
+  Earley.token FOLLOWING
 
 foreign_ :: Parser r Token
 foreign_ =
@@ -261,6 +273,10 @@ greaterThanSignGreaterThanSign =
 group :: Parser r Token
 group =
   Earley.token GROUP
+
+groups :: Parser r Token
+groups =
+  Earley.token GROUPS
 
 having :: Parser r Token
 having =
@@ -414,6 +430,10 @@ order :: Parser r Token
 order =
   Earley.token ORDER
 
+others :: Parser r Token
+others =
+  Earley.token OTHERS
+
 outer :: Parser r Token
 outer =
   Earley.token OUTER
@@ -421,6 +441,10 @@ outer =
 over :: Parser r Token
 over =
   Earley.token OVER
+
+partition :: Parser r Token
+partition =
+  Earley.token PARTITION
 
 percentSign :: Parser r Token
 percentSign =
@@ -430,6 +454,10 @@ plusSign :: Parser r Token
 plusSign =
   Earley.token PlusSign
 
+preceding :: Parser r Token
+preceding =
+  Earley.token PRECEDING
+
 primary :: Parser r Token
 primary =
   Earley.token PRIMARY
@@ -437,6 +465,10 @@ primary =
 raise :: Parser r Token
 raise =
   Earley.token RAISE
+
+range :: Parser r Token
+range =
+  Earley.token RANGE
 
 recursive :: Parser r Token
 recursive =
@@ -470,9 +502,17 @@ rollback :: Parser r Token
 rollback =
   Earley.token ROLLBACK
 
+row :: Parser r Token
+row =
+  Earley.token ROW
+
 rowid :: Parser r Token
 rowid =
   Earley.token ROWID
+
+rows :: Parser r Token
+rows =
+  Earley.token ROWS
 
 savepoint :: Parser r Token
 savepoint =
@@ -508,6 +548,10 @@ then_ :: Parser r Token
 then_ =
   Earley.token THEN
 
+ties :: Parser r Token
+ties =
+  Earley.token TIES
+
 to :: Parser r Token
 to =
   Earley.token TO
@@ -531,6 +575,10 @@ transaction =
 true :: Parser r Token
 true =
   Earley.token TRUE
+
+unbounded :: Parser r Token
+unbounded =
+  Earley.token UNBOUNDED
 
 union :: Parser r Token
 union =

@@ -67,6 +67,7 @@ library
     Sqlite.Syntax.Internal.Type.SchemaQualified
     Sqlite.Syntax.Internal.Type.SelectStatement
     Sqlite.Syntax.Internal.Type.TableQualified
+    Sqlite.Syntax.Internal.Type.Window
     Sqlite.Syntax.Parser.Token
     TextParser
 

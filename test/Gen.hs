@@ -151,10 +151,10 @@ genSelect =
     <*> Gen.maybe genTable
     <*> Gen.maybe genExpression
     <*> Gen.maybe genGroupByClause
-    <*> Gen.maybe genWindowClause
+    <*> Gen.maybe genWindow
   where
-    genWindowClause :: Gen (NonEmpty (Aliased Identity WindowDefinition))
-    genWindowClause = undefined
+    genWindow :: Gen (NonEmpty (Aliased Identity Window))
+    genWindow = undefined
 
 genSelectStatement :: Gen SelectStatement
 genSelectStatement = undefined
