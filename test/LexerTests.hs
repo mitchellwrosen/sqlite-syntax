@@ -235,7 +235,8 @@ genToken =
       Number <$> genNumber,
       String <$> Gen.text (Range.linear 0 10) Gen.unicode,
       Blob . elongateHexit <$> Gen.text (Range.linear 0 10) Gen.hexit,
-      Identifier <$> Gen.element ["foo", "bar", "baz"]
+      Identifier <$> Gen.element ["foo", "bar", "baz"],
+      Parameter <$> Gen.maybe (Gen.integral (Range.linear 0 10))
     ]
   where
     genNumber :: Gen Text

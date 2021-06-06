@@ -9,6 +9,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy.Builder as Text (Builder)
 import qualified Data.Text.Lazy.Builder as Text.Builder
 import GHC.Generics (Generic)
+import Numeric.Natural
 import Prelude
 
 {- ORMOLU_DISABLE -}
@@ -140,6 +141,7 @@ data Token
   | PRAGMA -- ^ @PRAGMA@
   | PRECEDING -- ^ @PRECEDING@
   | PRIMARY -- ^ @PRIMARY@
+  | Parameter (Maybe Natural) -- ^ @?[NNNN]@
   | PercentSign -- ^ @%@
   | PlusSign -- ^ @+@
   | QUERY -- ^ @QUERY@
@@ -324,6 +326,7 @@ render = \case
   PRAGMA -> "PRAGMA"
   PRECEDING -> "PRECEDING"
   PRIMARY -> "PRIMARY"
+  Parameter mn -> maybe id (\n -> (<> Text.Builder.fromString (show n))) mn "?"
   PercentSign -> "%"
   PlusSign -> "+"
   QUERY -> "QUERY"
