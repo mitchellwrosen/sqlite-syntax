@@ -125,6 +125,7 @@ data Token
   | NOTNULL -- ^ @NOTNULL@
   | NULL -- ^ @NULL@
   | NULLS -- ^ @NULLS@
+  -- TODO split into integer/real
   | Number Text -- ^ Numeric literal
   | OF -- ^ @OF@
   | OFFSET -- ^ @OFFSET@

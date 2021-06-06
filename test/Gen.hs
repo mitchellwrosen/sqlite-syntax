@@ -23,9 +23,6 @@ genAggregateFunctionArguments =
       AggregateFunctionArguments'Arguments <$> Gen.bool <*> Gen.nonEmpty (Range.linear 1 5) genExpression
     ]
 
-genBindParameter :: Gen BindParameter
-genBindParameter = undefined
-
 genCaseExpression :: Gen CaseExpression
 genCaseExpression =
   CaseExpression
@@ -37,9 +34,9 @@ genExpression :: Gen Expression
 genExpression =
   Gen.recursive
     Gen.choice
-    [ Expression'BindParameter <$> genBindParameter,
-      Expression'Column <$> genSchemaQualified (genTableQualified genIdentifier),
+    [ Expression'Column <$> genSchemaQualified (genTableQualified genIdentifier),
       Expression'LiteralValue <$> genLiteralValue,
+      Expression'Parameter <$> genParameter,
       Expression'Raise <$> genRaise
     ]
     [ Expression'AggregateFunctionCall <$> genAggregateFunctionCall,
@@ -129,6 +126,9 @@ genLiteralValue =
 genIdentifier :: Gen Text
 genIdentifier =
   Gen.element ["foo", "bar", "baz"]
+
+genParameter :: Gen Parameter
+genParameter = undefined
 
 genRaise :: Gen Raise
 genRaise =

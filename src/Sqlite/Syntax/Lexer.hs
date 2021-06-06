@@ -1,3 +1,4 @@
+-- Here's something: https://www.sqlite.org/draft/tokenreq.html
 module Sqlite.Syntax.Lexer
   ( lex,
   )
@@ -23,10 +24,6 @@ lex =
     pure tokens
 
 --
-
-keyword :: Text -> TextParser Text
-keyword s =
-  TextParser.string' s <* space
 
 space :: TextParser ()
 space =
@@ -65,159 +62,9 @@ token =
       VerticalLineVerticalLine <$ symbol "||",
       VerticalLine <$ symbol "|",
       Blob <$> blob,
-      Identifier <$> identifier,
-      ABORT <$ keyword "abort",
-      ACTION <$ keyword "action",
-      ADD <$ keyword "add",
-      AFTER <$ keyword "after",
-      ALL <$ keyword "all",
-      ALTER <$ keyword "alter",
-      ALWAYS <$ keyword "always",
-      ANALYZE <$ keyword "analyze",
-      AND <$ keyword "and",
-      ASC <$ keyword "asc",
-      AS <$ keyword "as",
-      ATTACH <$ keyword "attach",
-      AUTOINCREMENT <$ keyword "autoincrement",
-      BEFORE <$ keyword "before",
-      BEGIN <$ keyword "begin",
-      BETWEEN <$ keyword "between",
-      BY <$ keyword "by",
-      CASCADE <$ keyword "cascade",
-      CASE <$ keyword "case",
-      CAST <$ keyword "cast",
-      CHECK <$ keyword "check",
-      COLLATE <$ keyword "collate",
-      COLUMN <$ keyword "column",
-      COMMIT <$ keyword "commit",
-      CONFLICT <$ keyword "conflict",
-      CONSTRAINT <$ keyword "constraint",
-      CREATE <$ keyword "create",
-      CROSS <$ keyword "cross",
-      CURRENT_DATE <$ keyword "current_date",
-      CURRENT_TIMESTAMP <$ keyword "current_timestamp",
-      CURRENT_TIME <$ keyword "current_time",
-      CURRENT <$ keyword "current",
-      DATABASE <$ keyword "database",
-      DEFAULT <$ keyword "default",
-      DEFERRABLE <$ keyword "deferrable",
-      DEFERRED <$ keyword "deferred",
-      DELETE <$ keyword "delete",
-      DESC <$ keyword "desc",
-      DETACH <$ keyword "detach",
-      DISTINCT <$ keyword "distinct",
-      DO <$ keyword "do",
-      DROP <$ keyword "drop",
-      EACH <$ keyword "each",
-      ELSE <$ keyword "else",
-      END <$ keyword "end",
-      ESCAPE <$ keyword "escape",
-      EXCEPT <$ keyword "except",
-      EXCLUDE <$ keyword "exclude",
-      EXCLUSIVE <$ keyword "exclusive",
-      EXISTS <$ keyword "exists",
-      EXPLAIN <$ keyword "explain",
-      FAIL <$ keyword "fail",
-      FALSE <$ keyword "false",
-      FILTER <$ keyword "filter",
-      FIRST <$ keyword "first",
-      FOLLOWING <$ keyword "following",
-      FOREIGN <$ keyword "foreign",
-      FOR <$ keyword "for",
-      FROM <$ keyword "from",
-      FULL <$ keyword "full",
-      GENERATED <$ keyword "generated",
-      GLOB <$ keyword "glob",
-      GROUPS <$ keyword "groups",
-      GROUP <$ keyword "group",
-      HAVING <$ keyword "having",
-      IF <$ keyword "if",
-      IGNORE <$ keyword "ignore",
-      IMMEDIATE <$ keyword "immediate",
-      INDEXED <$ keyword "indexed",
-      INDEX <$ keyword "index",
-      INITIALLY <$ keyword "initially",
-      INNER <$ keyword "inner",
-      INSERT <$ keyword "insert",
-      INSTEAD <$ keyword "instead",
-      INTERSECT <$ keyword "intersect",
-      INTO <$ keyword "into",
-      IN <$ keyword "in",
-      ISNULL <$ keyword "isnull",
-      IS <$ keyword "is",
-      JOIN <$ keyword "join",
-      KEY <$ keyword "key",
-      LAST <$ keyword "last",
-      LEFT <$ keyword "left",
-      LIKE <$ keyword "like",
-      LIMIT <$ keyword "limit",
-      MATCH <$ keyword "match",
-      MATERIALIZED <$ keyword "materialized",
-      NATURAL <$ keyword "natural",
-      NOTHING <$ keyword "nothing",
-      NOTNULL <$ keyword "notnull",
-      NOT <$ keyword "not",
-      NO <$ keyword "no",
-      NULLS <$ keyword "nulls",
-      NULL <$ keyword "null",
-      OFFSET <$ keyword "offset",
-      OF <$ keyword "of",
-      ON <$ keyword "on",
-      ORDER <$ keyword "order",
-      OR <$ keyword "or",
-      OTHERS <$ keyword "others",
-      OUTER <$ keyword "outer",
-      OVER <$ keyword "over",
-      PARTITION <$ keyword "partition",
-      PLAN <$ keyword "plan",
-      PRAGMA <$ keyword "pragma",
-      PRECEDING <$ keyword "preceding",
-      PRIMARY <$ keyword "primary",
-      QUERY <$ keyword "query",
-      RAISE <$ keyword "raise",
-      RANGE <$ keyword "range",
-      RECURSIVE <$ keyword "recursive",
-      REFERENCES <$ keyword "references",
-      REGEXP <$ keyword "regexp",
-      REINDEX <$ keyword "reindex",
-      RELEASE <$ keyword "release",
-      RENAME <$ keyword "rename",
-      REPLACE <$ keyword "replace",
-      RESTRICT <$ keyword "restrict",
-      RETURNING <$ keyword "returning",
-      RIGHT <$ keyword "right",
-      ROLLBACK <$ keyword "rollback",
-      ROWID <$ keyword "rowid",
-      ROWS <$ keyword "rows",
-      ROW <$ keyword "row",
-      SAVEPOINT <$ keyword "savepoint",
-      SELECT <$ keyword "select",
-      SET <$ keyword "set",
-      STORED <$ keyword "stored",
-      TABLE <$ keyword "table",
-      TEMPORARY <$ keyword "temporary",
-      TEMP <$ keyword "temp",
-      THEN <$ keyword "then",
-      TIES <$ keyword "ties",
-      TO <$ keyword "to",
-      TRANSACTION <$ keyword "transaction",
-      TRIGGER <$ keyword "trigger",
-      TRUE <$ keyword "true",
-      UNBOUNDED <$ keyword "unbounded",
-      UNION <$ keyword "union",
-      UNIQUE <$ keyword "unique",
-      UPDATE <$ keyword "update",
-      USING <$ keyword "using",
-      VACUUM <$ keyword "vacuum",
-      VALUES <$ keyword "values",
-      VIEW <$ keyword "view",
-      VIRTUAL <$ keyword "virtual",
-      WHEN <$ keyword "when",
-      WHERE <$ keyword "where",
-      WINDOW <$ keyword "window",
-      WITHOUT <$ keyword "without",
-      WITH <$ keyword "with",
-      String <$> string
+      String <$> string,
+      unquotedIdentifier,
+      quotedIdentifier
       -- TODO parameters
     ]
   where
@@ -231,37 +78,28 @@ token =
         then s <$ space
         else fail "invalid hex data"
 
-    -- It appears any string is a valid identifier, even the empty string, except strings that begin with "sqlite_".
-    -- There are three different ways of quoting identifiers ("this", [this], and `this`), and within a quoted
-    -- identifier, I don't believe there is any escape syntax. (It seems impossible, therefore, to define an identifer
-    -- that happens to have a ", ], and ` character...). Still looking for official documentation on all of this. This
-    -- is all I've found:
-    --
-    --   https://stackoverflow.com/questions/3694276/what-are-valid-table-names-in-sqlite
-    identifier :: TextParser Text
-    identifier = do
-      s <- unquoted <|> quoted '"' '"' <|> quoted '[' ']' <|> quoted '`' '`'
-      if "sqlite_" `Text.isPrefixOf` s
-        then fail "reserved identifier"
-        else do
-          space
-          pure s
-      where
-        quoted :: Char -> Char -> TextParser Text
-        quoted c0 c1 = do
-          _ <- TextParser.char c0
-          TextParser.commit
-          s <- TextParser.takeWhile \c -> '\x20' <= c && c <= '\x10FFFF' && c /= c1
-          _ <- TextParser.char c1
-          pure s
+    -- This is kind of a guess. Still looking for official documentation.
+    unquotedIdentifier :: TextParser Token
+    unquotedIdentifier = do
+      x <- TextParser.satisfy isAlpha
+      TextParser.commit
+      xs <- TextParser.takeWhile (\c -> isAlphaNum c || c == '$' || c == '_')
+      space
+      fromIdentifier (Text.cons x xs)
 
-        -- This is just a guess for now. Still looking for official documentation.
-        unquoted :: TextParser Text
-        unquoted = do
-          x <- TextParser.satisfy isLower
+    quotedIdentifier :: TextParser Token
+    quotedIdentifier = do
+      s <- quoted '"' <|> bracketQuoted <|> quoted '`'
+      space
+      makeIdentifier s
+      where
+        bracketQuoted :: TextParser Text
+        bracketQuoted = do
+          _ <- TextParser.char '['
           TextParser.commit
-          xs <- TextParser.takeWhile (\c -> isAlphaNum c || c == '_')
-          pure (Text.cons x xs)
+          s <- TextParser.takeWhile \c -> isIdentifierChar c && c /= ']'
+          _ <- TextParser.char ']'
+          pure s
 
     number :: TextParser Text
     number =
@@ -314,18 +152,191 @@ token =
     -- encoded by putting two single quotes in a row - as in Pascal. C-style escapes using the backslash character are
     -- not supported because they are not standard SQL.
     string :: TextParser Text
-    string = do
-      _ <- TextParser.char '\''
-      TextParser.commit
-      chunks <- many (chunk <|> singleQuote)
-      _ <- TextParser.char '\''
-      space
-      pure (Text.concat chunks)
-      where
-        chunk :: TextParser Text
-        chunk =
-          TextParser.takeWhile1 \c -> ' ' <= c && c <= '\x10FFFF' && c /= '\''
+    string =
+      quoted '\'' <* space
 
-        singleQuote :: TextParser Text
-        singleQuote =
-          "'" <$ TextParser.string "''"
+-- TODO rename
+isIdentifierChar :: Char -> Bool
+isIdentifierChar c =
+  ' ' <= c && c <= '\x10FFFF'
+
+quoted :: Char -> TextParser Text
+quoted c0 = do
+  _ <- TextParser.char c0
+  TextParser.commit
+  chunks <- many (chunk <|> quote)
+  _ <- TextParser.char c0
+  pure (Text.concat chunks)
+  where
+    chunk :: TextParser Text
+    chunk =
+      TextParser.takeWhile1 \c -> isIdentifierChar c && c /= c0
+
+    quote :: TextParser Text
+    quote =
+      Text.singleton c0 <$ TextParser.string (Text.pack [c0,c0])
+
+fromIdentifier :: Text -> TextParser Token
+fromIdentifier s
+  | s' == "abort" = pure ABORT
+  | s' == "action" = pure ACTION
+  | s' == "add" = pure ADD
+  | s' == "after" = pure AFTER
+  | s' == "all" = pure ALL
+  | s' == "alter" = pure ALTER
+  | s' == "always" = pure ALWAYS
+  | s' == "analyze" = pure ANALYZE
+  | s' == "and" = pure AND
+  | s' == "asc" = pure ASC
+  | s' == "as" = pure AS
+  | s' == "attach" = pure ATTACH
+  | s' == "autoincrement" = pure AUTOINCREMENT
+  | s' == "before" = pure BEFORE
+  | s' == "begin" = pure BEGIN
+  | s' == "between" = pure BETWEEN
+  | s' == "by" = pure BY
+  | s' == "cascade" = pure CASCADE
+  | s' == "case" = pure CASE
+  | s' == "cast" = pure CAST
+  | s' == "check" = pure CHECK
+  | s' == "collate" = pure COLLATE
+  | s' == "column" = pure COLUMN
+  | s' == "commit" = pure COMMIT
+  | s' == "conflict" = pure CONFLICT
+  | s' == "constraint" = pure CONSTRAINT
+  | s' == "create" = pure CREATE
+  | s' == "cross" = pure CROSS
+  | s' == "current_date" = pure CURRENT_DATE
+  | s' == "current_timestamp" = pure CURRENT_TIMESTAMP
+  | s' == "current_time" = pure CURRENT_TIME
+  | s' == "current" = pure CURRENT
+  | s' == "database" = pure DATABASE
+  | s' == "default" = pure DEFAULT
+  | s' == "deferrable" = pure DEFERRABLE
+  | s' == "deferred" = pure DEFERRED
+  | s' == "delete" = pure DELETE
+  | s' == "desc" = pure DESC
+  | s' == "detach" = pure DETACH
+  | s' == "distinct" = pure DISTINCT
+  | s' == "do" = pure DO
+  | s' == "drop" = pure DROP
+  | s' == "each" = pure EACH
+  | s' == "else" = pure ELSE
+  | s' == "end" = pure END
+  | s' == "escape" = pure ESCAPE
+  | s' == "except" = pure EXCEPT
+  | s' == "exclude" = pure EXCLUDE
+  | s' == "exclusive" = pure EXCLUSIVE
+  | s' == "exists" = pure EXISTS
+  | s' == "explain" = pure EXPLAIN
+  | s' == "fail" = pure FAIL
+  | s' == "false" = pure FALSE
+  | s' == "filter" = pure FILTER
+  | s' == "first" = pure FIRST
+  | s' == "following" = pure FOLLOWING
+  | s' == "foreign" = pure FOREIGN
+  | s' == "for" = pure FOR
+  | s' == "from" = pure FROM
+  | s' == "full" = pure FULL
+  | s' == "generated" = pure GENERATED
+  | s' == "glob" = pure GLOB
+  | s' == "groups" = pure GROUPS
+  | s' == "group" = pure GROUP
+  | s' == "having" = pure HAVING
+  | s' == "if" = pure IF
+  | s' == "ignore" = pure IGNORE
+  | s' == "immediate" = pure IMMEDIATE
+  | s' == "indexed" = pure INDEXED
+  | s' == "index" = pure INDEX
+  | s' == "initially" = pure INITIALLY
+  | s' == "inner" = pure INNER
+  | s' == "insert" = pure INSERT
+  | s' == "instead" = pure INSTEAD
+  | s' == "intersect" = pure INTERSECT
+  | s' == "into" = pure INTO
+  | s' == "in" = pure IN
+  | s' == "isnull" = pure ISNULL
+  | s' == "is" = pure IS
+  | s' == "join" = pure JOIN
+  | s' == "key" = pure KEY
+  | s' == "last" = pure LAST
+  | s' == "left" = pure LEFT
+  | s' == "like" = pure LIKE
+  | s' == "limit" = pure LIMIT
+  | s' == "match" = pure MATCH
+  | s' == "materialized" = pure MATERIALIZED
+  | s' == "natural" = pure NATURAL
+  | s' == "nothing" = pure NOTHING
+  | s' == "notnull" = pure NOTNULL
+  | s' == "not" = pure NOT
+  | s' == "no" = pure NO
+  | s' == "nulls" = pure NULLS
+  | s' == "null" = pure NULL
+  | s' == "offset" = pure OFFSET
+  | s' == "of" = pure OF
+  | s' == "on" = pure ON
+  | s' == "order" = pure ORDER
+  | s' == "or" = pure OR
+  | s' == "others" = pure OTHERS
+  | s' == "outer" = pure OUTER
+  | s' == "over" = pure OVER
+  | s' == "partition" = pure PARTITION
+  | s' == "plan" = pure PLAN
+  | s' == "pragma" = pure PRAGMA
+  | s' == "preceding" = pure PRECEDING
+  | s' == "primary" = pure PRIMARY
+  | s' == "query" = pure QUERY
+  | s' == "raise" = pure RAISE
+  | s' == "range" = pure RANGE
+  | s' == "recursive" = pure RECURSIVE
+  | s' == "references" = pure REFERENCES
+  | s' == "regexp" = pure REGEXP
+  | s' == "reindex" = pure REINDEX
+  | s' == "release" = pure RELEASE
+  | s' == "rename" = pure RENAME
+  | s' == "replace" = pure REPLACE
+  | s' == "restrict" = pure RESTRICT
+  | s' == "returning" = pure RETURNING
+  | s' == "right" = pure RIGHT
+  | s' == "rollback" = pure ROLLBACK
+  | s' == "rowid" = pure ROWID
+  | s' == "rows" = pure ROWS
+  | s' == "row" = pure ROW
+  | s' == "savepoint" = pure SAVEPOINT
+  | s' == "select" = pure SELECT
+  | s' == "set" = pure SET
+  | s' == "stored" = pure STORED
+  | s' == "table" = pure TABLE
+  | s' == "temporary" = pure TEMPORARY
+  | s' == "temp" = pure TEMP
+  | s' == "then" = pure THEN
+  | s' == "ties" = pure TIES
+  | s' == "to" = pure TO
+  | s' == "transaction" = pure TRANSACTION
+  | s' == "trigger" = pure TRIGGER
+  | s' == "true" = pure TRUE
+  | s' == "unbounded" = pure UNBOUNDED
+  | s' == "union" = pure UNION
+  | s' == "unique" = pure UNIQUE
+  | s' == "update" = pure UPDATE
+  | s' == "using" = pure USING
+  | s' == "vacuum" = pure VACUUM
+  | s' == "values" = pure VALUES
+  | s' == "view" = pure VIEW
+  | s' == "virtual" = pure VIRTUAL
+  | s' == "when" = pure WHEN
+  | s' == "where" = pure WHERE
+  | s' == "window" = pure WINDOW
+  | s' == "without" = pure WITHOUT
+  | s' == "with" = pure WITH
+  | otherwise = makeIdentifier s
+  where
+    s' :: Text
+    s' =
+      Text.toLower s
+
+makeIdentifier :: Text -> TextParser Token
+makeIdentifier s =
+  if "sqlite_" `Text.isPrefixOf` s
+    then fail "reserved identifier"
+    else pure (Identifier s)

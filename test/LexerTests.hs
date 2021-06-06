@@ -1,5 +1,6 @@
 module LexerTests
   ( propRoundTrip,
+    unitTests,
   )
 where
 
@@ -24,6 +25,26 @@ propRoundTrip = do
   case lex (buildText (renderTokens tokens0)) of
     Left err -> fail (Text.unpack err)
     Right tokens1 -> tokens0 === tokens1
+
+unitTests :: PropertyT IO ()
+unitTests = do
+  -- keyword should parse as such, not an identifier
+  lex "abort" === Right [ABORT]
+
+  -- quoted keyword is an identifier
+  lex "\"abort\"" === Right [Identifier "abort"]
+  lex "[abort]" === Right [Identifier "abort"]
+  lex "`abort`" === Right [Identifier "abort"]
+
+  -- empty identifiers are allowed
+  lex "\"\"" === Right [Identifier ""]
+  lex "[]" === Right [Identifier ""]
+  lex "``" === Right [Identifier ""]
+
+  -- inside a double-quoted identifier, two double-quotes makes a single double quote
+  lex "\"  foo\"\"bar  \"" === Right [Identifier "  foo\"bar  "]
+
+--
 
 buildText :: Text.Builder -> Text
 buildText =

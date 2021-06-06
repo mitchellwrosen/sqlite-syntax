@@ -3,6 +3,7 @@ module Sqlite.Syntax.Internal.Type.Expression where
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import GHC.Generics (Generic)
+import Numeric.Natural (Natural)
 import Sqlite.Syntax.Internal.Type.FunctionCall (FunctionCall)
 import Sqlite.Syntax.Internal.Type.LiteralValue (LiteralValue)
 import Sqlite.Syntax.Internal.Type.SchemaQualified (SchemaQualified)
@@ -18,8 +19,11 @@ data AggregateFunctionCall = AggregateFunctionCall
   deriving stock (Eq, Generic, Show)
 
 -- TODO move this
-data BindParameter
-  = BindParameter'TODO
+data Parameter
+  = -- | @:NAME@, @\@NAME@, @$NAME@
+    Parameter'Named Text
+  | -- | @?@, @?N@
+    Parameter'Ordinal (Maybe Natural)
   deriving stock (Eq, Generic, Show)
 
 -- | @CASE ... WHEN ... THEN ... ELSE ... END@
@@ -48,7 +52,6 @@ data Expression
     Expression'And Expression Expression
   | -- | @... BETWEEN ... AND ...@
     Expression'Between Expression Expression Expression
-  | Expression'BindParameter BindParameter
   | -- | @... & ...@
     Expression'BitwiseAnd Expression Expression
   | -- | @... ~ ...@
@@ -104,6 +107,7 @@ data Expression
     Expression'NotEquals Expression Expression
   | -- | @... OR ...@
     Expression'Or Expression Expression
+  | Expression'Parameter Parameter
   | -- | @... + ...@
     Expression'Plus Expression Expression
   | Expression'Raise Raise

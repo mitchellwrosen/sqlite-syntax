@@ -116,12 +116,10 @@ statementParser = mdo
   expressionParser <- makeExpression selectStatementParser windowParser
   indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
   orderingTermParser <- Earley.rule (makeOrderingTermParser expressionParser)
-  qualifiedTableNameParser <- Earley.rule makeQualifiedTableNameParser
   selectStatementParser <-
     makeSelectStatementParser
       expressionParser
       orderingTermParser
-      qualifiedTableNameParser
       windowParser
   windowParser <- Earley.rule (makeWindowParser expressionParser orderingTermParser)
 
@@ -182,22 +180,6 @@ statementParser = mdo
         <*> optional (Token.collate *> Token.identifier)
         <*> orderingParser
         <*> optional nullsWhichParser
-
-    makeQualifiedTableNameParser :: Parser r QualifiedTableName
-    makeQualifiedTableNameParser =
-      QualifiedTableName
-        <$> ( Aliased
-                <$> schemaQualified Token.identifier
-                <*> optional (Token.as *> Token.identifier)
-            )
-        <*> optional indexedByParser
-      where
-        indexedByParser :: Parser r IndexedBy
-        indexedByParser =
-          choice
-            [ IndexedBy'IndexedBy <$> (Token.indexed *> Token.by *> Token.identifier),
-              IndexedBy'NotIndexed <$ (Token.not *> Token.indexed)
-            ]
 
     makeWindowParser :: Parser r Expression -> Parser r OrderingTerm -> Parser r Window
     makeWindowParser expressionParser orderingTermParser =
@@ -321,9 +303,6 @@ data AttachStatement = AttachStatement
 makeAttachStatement :: Parser r Expression -> Parser r AttachStatement
 makeAttachStatement expression =
   AttachStatement <$> (Token.attach *> optional Token.database *> expression) <*> (Token.as *> Token.identifier)
-
-bindParameter :: Parser r BindParameter
-bindParameter = undefined
 
 data ColumnConstraint
   = ColumnConstraint'Check Expression
@@ -502,17 +481,7 @@ makeExpression selectStatement windowParser = mdo
                       )
                     <*> optional filterClauseParser
                 ),
-          Expression'BindParameter <$> bindParameter,
-          Expression'Case
-            <$> ( CaseExpression
-                    <$> (Token.case_ *> optional expression)
-                    <*> some ((,) <$> (Token.when *> expression) <*> (Token.then_ *> expression))
-                    <*> choice
-                      [ Token.else_ *> expression,
-                        pure (Expression'LiteralValue LiteralValue'Null)
-                      ]
-                    <* Token.end
-                ),
+          Expression'Case <$> caseExpressionParser expression,
           Expression'Cast
             <$> ( CastExpression
                     <$> (Token.cast *> Token.leftParenthesis *> expression)
@@ -522,6 +491,7 @@ makeExpression selectStatement windowParser = mdo
           Expression'Exists <$> (Token.exists *> parens selectStatement),
           Expression'FunctionCall <$> simpleFunctionCallParser,
           Expression'LiteralValue <$> literalValue,
+          Expression'Parameter <$> parameterParser,
           Expression'Raise <$> raiseParser,
           Expression'RowValue
             <$> ( RowValue
@@ -671,6 +641,23 @@ makeExpression selectStatement windowParser = mdo
       [ Expression'Collate <$> (CollateExpression <$> e1 <*> (Token.collate *> Token.identifier)),
         e2
       ]
+
+    caseExpressionParser :: Parser r Expression -> Parser r CaseExpression
+    caseExpressionParser expressionParser =
+      CaseExpression
+        <$> (Token.case_ *> optional expressionParser)
+        <*> some ((,) <$> (Token.when *> expressionParser) <*> (Token.then_ *> expressionParser))
+        <*> choice
+          [ Token.else_ *> expressionParser,
+            pure (Expression'LiteralValue LiteralValue'Null)
+          ]
+        <* Token.end
+
+    parameterParser :: Parser r Parameter
+    parameterParser =
+      choice
+        [ Parameter'Named <$> undefined
+        ]
 
 foreignKeyClauseParser :: forall r. Parser r ForeignKeyClause
 foreignKeyClauseParser =
@@ -847,10 +834,9 @@ makeSelectStatementParser ::
   forall r.
   Parser r Expression ->
   Parser r OrderingTerm ->
-  Parser r QualifiedTableName ->
   Parser r Window ->
   Earley.Grammar r (Parser r SelectStatement)
-makeSelectStatementParser expressionParser orderingTermParser qualifiedTableNameParser windowParser = mdo
+makeSelectStatementParser expressionParser orderingTermParser windowParser = mdo
   commonTableExpressionParser <- Earley.rule (makeCommonTableExpressionParser selectStatementParser)
   compoundSelectParser <- makeCompoundSelectParser tableParser
   selectStatementParser <-
@@ -1001,6 +987,22 @@ makeSelectStatementParser expressionParser orderingTermParser qualifiedTableName
               parens tableParser
             ]
       pure tableParser
+      where
+        qualifiedTableNameParser :: Parser r QualifiedTableName
+        qualifiedTableNameParser =
+          QualifiedTableName
+            <$> ( Aliased
+                    <$> schemaQualified Token.identifier
+                    <*> optional (Token.as *> Token.identifier)
+                )
+            <*> optional indexedByParser
+          where
+            indexedByParser :: Parser r IndexedBy
+            indexedByParser =
+              choice
+                [ IndexedBy'IndexedBy <$> (Token.indexed *> Token.by *> Token.identifier),
+                  IndexedBy'NotIndexed <$ (Token.not *> Token.indexed)
+                ]
 
 data Sign
   = Sign'HyphenMinus
