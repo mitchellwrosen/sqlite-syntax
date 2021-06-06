@@ -312,6 +312,10 @@ index :: Parser r Token
 index =
   Earley.token INDEX
 
+indexed :: Parser r Token
+indexed =
+  Earley.token INDEXED
+
 initially :: Parser r Token
 initially =
   Earley.token INITIALLY

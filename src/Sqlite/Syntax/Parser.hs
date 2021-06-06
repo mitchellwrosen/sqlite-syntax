@@ -116,7 +116,7 @@ statementParser = mdo
   expressionParser <- makeExpression selectStatementParser windowParser
   indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
   orderingTermParser <- Earley.rule (makeOrderingTermParser expressionParser)
-  qualifiedTableNameParser <- Earley.rule undefined
+  qualifiedTableNameParser <- Earley.rule makeQualifiedTableNameParser
   selectStatementParser <-
     makeSelectStatementParser
       expressionParser
@@ -125,9 +125,7 @@ statementParser = mdo
       windowParser
   windowParser <- Earley.rule (makeWindowParser expressionParser orderingTermParser)
 
-  let alterTableStatement = makeAlterTableStatement columnDefinitionParser
-      attachStatement = makeAttachStatement expressionParser
-      createIndexStatement = makeCreateIndexStatement expressionParser indexedColumnParser
+  let createIndexStatement = makeCreateIndexStatement expressionParser indexedColumnParser
       createTableStatement =
         makeCreateTableStatement
           columnDefinitionParser
@@ -137,9 +135,9 @@ statementParser = mdo
 
   pure do
     choice
-      [ Statement'AlterTable <$> alterTableStatement,
+      [ Statement'AlterTable <$> makeAlterTableStatement columnDefinitionParser,
         Statement'Analyze <$> analyzeStatement,
-        Statement'Attach <$> attachStatement,
+        Statement'Attach <$> makeAttachStatement expressionParser,
         Statement'Begin
           <$> ( Token.begin
                   *> choice
@@ -184,6 +182,22 @@ statementParser = mdo
         <*> optional (Token.collate *> Token.identifier)
         <*> orderingParser
         <*> optional nullsWhichParser
+
+    makeQualifiedTableNameParser :: Parser r QualifiedTableName
+    makeQualifiedTableNameParser =
+      QualifiedTableName
+        <$> ( Aliased
+                <$> schemaQualified Token.identifier
+                <*> optional (Token.as *> Token.identifier)
+            )
+        <*> optional indexedByParser
+      where
+        indexedByParser :: Parser r IndexedBy
+        indexedByParser =
+          choice
+            [ IndexedBy'IndexedBy <$> (Token.indexed *> Token.by *> Token.identifier),
+              IndexedBy'NotIndexed <$ (Token.not *> Token.indexed)
+            ]
 
     makeWindowParser :: Parser r Expression -> Parser r OrderingTerm -> Parser r Window
     makeWindowParser expressionParser orderingTermParser =
