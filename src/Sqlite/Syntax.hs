@@ -23,6 +23,7 @@ module Sqlite.Syntax
     Namespaced (..),
     Parameter (..),
     Raise (..),
+    ResultColumn (..),
     RowValue (..),
     Select (..),
     SelectCore (..),

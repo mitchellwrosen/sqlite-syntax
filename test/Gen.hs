@@ -144,11 +144,15 @@ genRaise =
       Raise'Rollback "error"
     ]
 
+genResultColumn :: Gen ResultColumn
+genResultColumn =
+  undefined
+
 genSelect :: Gen Select
 genSelect =
   Select
     <$> Gen.bool
-    <*> Gen.nonEmpty (Range.linear 1 5) (genNamespaced (genNamespaced genIdentifier genIdentifier) genIdentifier)
+    <*> Gen.nonEmpty (Range.linear 1 5) genResultColumn
     <*> Gen.maybe genTable
     <*> Gen.maybe genExpression
     <*> Gen.maybe genGroupByClause

@@ -59,10 +59,16 @@ data LimitClause = LimitClause
   }
   deriving stock (Eq, Generic, Show)
 
+-- | https://sqlite.org/syntax/result-column.html
+data ResultColumn
+  = ResultColumn'Expression (Aliased Maybe Expression)
+  | ResultColumn'Wildcard (Namespaced Text ())
+  deriving stock (Eq, Generic, Show)
+
 data Select = Select
   { -- | @DISTINCT@
     distinct :: Bool,
-    columns :: NonEmpty (Namespaced (Namespaced Text Text) Text),
+    columns :: NonEmpty ResultColumn,
     -- | @FROM ...@
     from :: Maybe Table,
     -- | @WHERE ...@

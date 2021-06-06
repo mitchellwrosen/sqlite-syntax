@@ -910,7 +910,7 @@ makeSelectStatementParser expressionParser orderingTermParser windowParser = mdo
         Earley.rule do
           Select
             <$> distinctParser
-            <*> commaSep1 (namespaced (namespaced Token.identifier Token.identifier) Token.identifier)
+            <*> commaSep1 resultColumnRule
             <*> optional (Token.from *> tableParser)
             <*> optional (Token.where_ *> expressionParser)
             <*> optional groupByClauseParser
@@ -937,6 +937,12 @@ makeSelectStatementParser expressionParser orderingTermParser windowParser = mdo
           GroupByClause
             <$> (Token.group *> Token.by *> commaSep1 expressionParser)
             <*> optional (Token.having *> expressionParser)
+        resultColumnRule :: Rule r ResultColumn
+        resultColumnRule =
+          choice
+            [ ResultColumn'Expression <$> (Aliased <$> expressionParser <*> optional (Token.as *> Token.identifier)),
+              ResultColumn'Wildcard <$> namespaced Token.identifier (() <$ Token.asterisk)
+            ]
         windowClauseParser :: Rule r (NonEmpty (Aliased Identity Window))
         windowClauseParser =
           Token.window
