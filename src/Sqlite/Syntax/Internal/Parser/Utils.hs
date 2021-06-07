@@ -13,12 +13,12 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Sqlite.Syntax.Parser.Token as Token
-import Sqlite.Syntax.Token (Token)
+import Sqlite.Syntax.Token (LocatedToken)
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, lex, not, null)
 
 type Rule r =
-  Earley.Prod r Text Token
+  Earley.Prod r Text LocatedToken
 
 commaSep0 :: Rule r a -> Rule r [a]
 commaSep0 p =

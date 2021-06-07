@@ -24,7 +24,11 @@ parseGoldenFiles = do
       Text.putStrLn sql
       Text.putStrLn "\n==>\n"
       case Parser.parseStatement sql of
-        Left err -> pPrint err
+        Left err -> do
+          case err of
+            Parser.SyntaxError {} -> Text.putStrLn (Parser.renderParseError err)
+            Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
+            Parser.AmbiguousParse x -> pPrint x
         Right statement -> do
           Text.putStrLn (Text.pack (show statement))
           _ <- getLine

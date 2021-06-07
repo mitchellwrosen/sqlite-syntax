@@ -1,5 +1,6 @@
 module Sqlite.Syntax.Token
-  ( Token (..),
+  ( LocatedToken (..),
+    Token (..),
     render,
   )
 where
@@ -11,6 +12,10 @@ import qualified Data.Text.Lazy.Builder as Text.Builder
 import GHC.Generics (Generic)
 import Numeric.Natural
 import Prelude
+
+data LocatedToken
+  = LocatedToken Token Int
+  deriving stock (Eq, Generic, Show)
 
 {- ORMOLU_DISABLE -}
 data Token

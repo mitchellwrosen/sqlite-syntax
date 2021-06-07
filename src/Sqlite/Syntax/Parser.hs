@@ -8,7 +8,9 @@ import Control.Applicative.Combinators.NonEmpty (some)
 import Data.Functor.Identity (Identity (..))
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.Aliased
@@ -24,9 +26,10 @@ import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Window
 import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
-import Sqlite.Syntax.Token (Token)
+import Sqlite.Syntax.Token (LocatedToken (..), Token)
 import qualified Sqlite.Syntax.Token as Token
 import qualified Text.Earley as Earley
+import qualified Text.Megaparsec as Megaparsec
 import Prelude hiding (Ordering, fail, lex, not, null)
 
 -- TODO simplify some things with defaults (e.g. missing distinct/all == all)
@@ -41,27 +44,76 @@ import Prelude hiding (Ordering, fail, lex, not, null)
 --
 
 -- TODO this is temporary
-data ParseError a
-  = LexError Text
-  | ParseError (Earley.Report Text [Token])
-  | AmbiguousParse [a]
-  deriving stock (Eq, Show)
+data ParseError
+  = SyntaxError Text Int
+  | ParseError Text (Maybe Int) [Text]
+  | -- Temporary
+    forall a. Show a => AmbiguousParse a
 
-parse :: Earley.Parser Text [Token] a -> Text -> Either (ParseError a) a
+parse :: Show a => Earley.Parser Text [LocatedToken] a -> Text -> Either ParseError a
 parse parser sql =
   case lex sql of
-    Left err -> Left (LexError err)
+    Left errorBundle ->
+      Left (SyntaxError sql (Megaparsec.errorOffset (NonEmpty.head (Megaparsec.bundleErrors errorBundle))))
     Right tokens ->
       case Earley.fullParses parser tokens of
-        ([], report) -> Left (ParseError report)
+        ([], Earley.Report {expected, unconsumed}) ->
+          Left
+            ( ParseError
+                sql
+                ( case unconsumed of
+                    [] -> Nothing
+                    LocatedToken _ offset : _ -> Just offset
+                )
+                expected
+            )
         ([s], _) -> Right s
         (ss, _) -> Left (AmbiguousParse ss)
 
-parseExpression :: Text -> Either (ParseError Expression) Expression
+renderParseError :: ParseError -> Text
+renderParseError = \case
+  SyntaxError input offset -> renderError "Syntax error" input (Just offset)
+  ParseError input maybeOffset expected -> renderError ("Expected " <> Text.intercalate ", " expected) input maybeOffset
+  AmbiguousParse ss -> Text.pack (show ss)
+  where
+    renderError :: Text -> Text -> Maybe Int -> Text
+    renderError message code maybeOffset =
+      fromMaybe message do
+        offset <- maybeOffset
+        context <- maybeContext offset
+        pure (message <> "\n\n" <> context)
+      where
+        maybeContext :: Int -> Maybe Text
+        maybeContext offset = do
+          let ( maybeInputLine,
+                Megaparsec.PosState {pstateSourcePos = Megaparsec.SourcePos {sourceColumn, sourceLine}}
+                ) =
+                  Megaparsec.reachOffset offset initialState
+          inputLine <- maybeInputLine
+          let line = Text.pack (show (Megaparsec.unPos sourceLine))
+              left = Text.replicate (Text.length line) " " <> " │"
+          pure do
+            Text.unlines
+              [ left,
+                line <> " │ " <> Text.pack inputLine,
+                left <> Text.replicate (Megaparsec.unPos sourceColumn) " " <> "↑"
+              ]
+          where
+            initialState :: Megaparsec.PosState Text
+            initialState =
+              Megaparsec.PosState
+                { pstateInput = code,
+                  pstateOffset = 0,
+                  pstateSourcePos = Megaparsec.initialPos "",
+                  pstateTabWidth = Megaparsec.defaultTabWidth,
+                  pstateLinePrefix = ""
+                }
+
+parseExpression :: Text -> Either ParseError Expression
 parseExpression =
   parse (Earley.parser (synExpression <$> syntaxParser))
 
-parseStatement :: Text -> Either (ParseError Statement) Statement
+parseStatement :: Text -> Either ParseError Statement
 parseStatement =
   parse (Earley.parser (synStatement <$> syntaxParser))
 

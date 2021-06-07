@@ -1,653 +1,654 @@
 module Sqlite.Syntax.Parser.Token where
 
+import Control.Monad
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import Sqlite.Syntax.Token (Token (..))
+import Sqlite.Syntax.Token (LocatedToken (..), Token (..))
 import qualified Text.Earley as Earley
 import Prelude hiding (Ordering, fail, not, null)
 
 type Terminal r =
-  Earley.Prod r Text Token
+  Earley.Prod r Text LocatedToken
 
-abort :: Terminal r Token
+abort :: Terminal r ()
 abort =
-  Earley.token ABORT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ABORT)
 
-action :: Terminal r Token
+action :: Terminal r ()
 action =
-  Earley.token ACTION
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ACTION)
 
-add :: Terminal r Token
+add :: Terminal r ()
 add =
-  Earley.token ADD
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ADD)
 
-all :: Terminal r Token
+all :: Terminal r ()
 all =
-  Earley.token ALL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ALL)
 
-alter :: Terminal r Token
+alter :: Terminal r ()
 alter =
-  Earley.token ALTER
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ALTER)
 
-always :: Terminal r Token
+always :: Terminal r ()
 always =
-  Earley.token ALWAYS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ALWAYS)
 
-ampersand :: Terminal r Token
+ampersand :: Terminal r ()
 ampersand =
-  Earley.token Ampersand
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == Ampersand)
 
-analyze :: Terminal r Token
+analyze :: Terminal r ()
 analyze =
-  Earley.token ANALYZE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ANALYZE)
 
-and :: Terminal r Token
+and :: Terminal r ()
 and =
-  Earley.token AND
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == AND)
 
-as :: Terminal r Token
+as :: Terminal r ()
 as =
-  Earley.token AS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == AS)
 
-asc :: Terminal r Token
+asc :: Terminal r ()
 asc =
-  Earley.token ASC
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ASC)
 
-asterisk :: Terminal r Token
+asterisk :: Terminal r ()
 asterisk =
-  Earley.token Asterisk
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == Asterisk)
 
-attach :: Terminal r Token
+attach :: Terminal r ()
 attach =
-  Earley.token ATTACH
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ATTACH)
 
-autoincrement :: Terminal r Token
+autoincrement :: Terminal r ()
 autoincrement =
-  Earley.token AUTOINCREMENT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == AUTOINCREMENT)
 
-begin :: Terminal r Token
+begin :: Terminal r ()
 begin =
-  Earley.token BEGIN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == BEGIN)
 
-between :: Terminal r Token
+between :: Terminal r ()
 between =
-  Earley.token BETWEEN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == BETWEEN)
 
 blob :: Terminal r Text
 blob =
   Earley.terminal \case
-    Blob s -> Just s
+    LocatedToken (Blob s) _ -> Just s
     _ -> Nothing
 
-by :: Terminal r Token
+by :: Terminal r ()
 by =
-  Earley.token BY
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == BY)
 
-cascade :: Terminal r Token
+cascade :: Terminal r ()
 cascade =
-  Earley.token CASCADE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CASCADE)
 
-case_ :: Terminal r Token
+case_ :: Terminal r ()
 case_ =
-  Earley.token CASE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CASE)
 
-cast :: Terminal r Token
+cast :: Terminal r ()
 cast =
-  Earley.token CAST
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CAST)
 
-check :: Terminal r Token
+check :: Terminal r ()
 check =
-  Earley.token CHECK
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CHECK)
 
-collate :: Terminal r Token
+collate :: Terminal r ()
 collate =
-  Earley.token COLLATE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == COLLATE)
 
-column :: Terminal r Token
+column :: Terminal r ()
 column =
-  Earley.token COLUMN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == COLUMN)
 
-comma :: Terminal r Token
+comma :: Terminal r ()
 comma =
-  Earley.token Comma
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == Comma)
 
-commit :: Terminal r Token
+commit :: Terminal r ()
 commit =
-  Earley.token COMMIT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == COMMIT)
 
-conflict :: Terminal r Token
+conflict :: Terminal r ()
 conflict =
-  Earley.token CONFLICT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CONFLICT)
 
-constraint :: Terminal r Token
+constraint :: Terminal r ()
 constraint =
-  Earley.token CONSTRAINT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CONSTRAINT)
 
-create :: Terminal r Token
+create :: Terminal r ()
 create =
-  Earley.token CREATE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CREATE)
 
-cross :: Terminal r Token
+cross :: Terminal r ()
 cross =
-  Earley.token CROSS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CROSS)
 
-current :: Terminal r Token
+current :: Terminal r ()
 current =
-  Earley.token CURRENT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CURRENT)
 
-currentDate :: Terminal r Token
+currentDate :: Terminal r ()
 currentDate =
-  Earley.token CURRENT_DATE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CURRENT_DATE)
 
-currentTime :: Terminal r Token
+currentTime :: Terminal r ()
 currentTime =
-  Earley.token CURRENT_TIME
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CURRENT_TIME)
 
-currentTimestamp :: Terminal r Token
+currentTimestamp :: Terminal r ()
 currentTimestamp =
-  Earley.token CURRENT_TIMESTAMP
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == CURRENT_TIMESTAMP)
 
-database :: Terminal r Token
+database :: Terminal r ()
 database =
-  Earley.token DATABASE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DATABASE)
 
-default_ :: Terminal r Token
+default_ :: Terminal r ()
 default_ =
-  Earley.token DEFAULT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DEFAULT)
 
-deferrable :: Terminal r Token
+deferrable :: Terminal r ()
 deferrable =
-  Earley.token DEFERRABLE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DEFERRABLE)
 
 deferred :: Terminal r Token
 deferred =
-  Earley.token DEFERRED
+  Earley.terminal \(LocatedToken tok _) -> DEFERRED <$ guard (tok == DEFERRED)
 
-delete :: Terminal r Token
+delete :: Terminal r ()
 delete =
-  Earley.token DELETE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DELETE)
 
-desc :: Terminal r Token
+desc :: Terminal r ()
 desc =
-  Earley.token DESC
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DESC)
 
-distinct :: Terminal r Token
+distinct :: Terminal r ()
 distinct =
-  Earley.token DISTINCT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DISTINCT)
 
-drop :: Terminal r Token
+drop :: Terminal r ()
 drop =
-  Earley.token DROP
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == DROP)
 
-else_ :: Terminal r Token
+else_ :: Terminal r ()
 else_ =
-  Earley.token ELSE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ELSE)
 
-end :: Terminal r Token
+end :: Terminal r ()
 end =
-  Earley.token END
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == END)
 
-equalsSign :: Terminal r Token
+equalsSign :: Terminal r ()
 equalsSign =
-  Earley.token EqualsSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == EqualsSign)
 
-equalsSignEqualsSign :: Terminal r Token
+equalsSignEqualsSign :: Terminal r ()
 equalsSignEqualsSign =
-  Earley.token EqualsSignEqualsSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == EqualsSignEqualsSign)
 
-escape :: Terminal r Token
+escape :: Terminal r ()
 escape =
-  Earley.token ESCAPE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ESCAPE)
 
-except :: Terminal r Token
+except :: Terminal r ()
 except =
-  Earley.token EXCEPT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == EXCEPT)
 
-exclamationMarkEqualsSign :: Terminal r Token
+exclamationMarkEqualsSign :: Terminal r ()
 exclamationMarkEqualsSign =
-  Earley.token ExclamationMarkEqualsSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ExclamationMarkEqualsSign)
 
-exclude :: Terminal r Token
+exclude :: Terminal r ()
 exclude =
-  Earley.token EXCLUDE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == EXCLUDE)
 
-exclusive :: Terminal r Token
+exclusive :: Terminal r ()
 exclusive =
-  Earley.token EXCLUSIVE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == EXCLUSIVE)
 
-exists :: Terminal r Token
+exists :: Terminal r ()
 exists =
-  Earley.token EXISTS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == EXISTS)
 
-fail :: Terminal r Token
+fail :: Terminal r ()
 fail =
-  Earley.token FAIL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FAIL)
 
-false :: Terminal r Token
+false :: Terminal r ()
 false =
-  Earley.token FALSE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FALSE)
 
-filter :: Terminal r Token
+filter :: Terminal r ()
 filter =
-  Earley.token FILTER
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FILTER)
 
-first :: Terminal r Token
+first :: Terminal r ()
 first =
-  Earley.token FIRST
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FIRST)
 
-following :: Terminal r Token
+following :: Terminal r ()
 following =
-  Earley.token FOLLOWING
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FOLLOWING)
 
-foreign_ :: Terminal r Token
+foreign_ :: Terminal r ()
 foreign_ =
-  Earley.token FOREIGN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FOREIGN)
 
-from :: Terminal r Token
+from :: Terminal r ()
 from =
-  Earley.token FROM
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FROM)
 
-fullStop :: Terminal r Token
+fullStop :: Terminal r ()
 fullStop =
-  Earley.token FullStop
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == FullStop)
 
-generated :: Terminal r Token
+generated :: Terminal r ()
 generated =
-  Earley.token GENERATED
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GENERATED)
 
-glob :: Terminal r Token
+glob :: Terminal r ()
 glob =
-  Earley.token GLOB
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GLOB)
 
-greaterThanSign :: Terminal r Token
+greaterThanSign :: Terminal r ()
 greaterThanSign =
-  Earley.token GreaterThanSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GreaterThanSign)
 
-greaterThanSignEqualsSign :: Terminal r Token
+greaterThanSignEqualsSign :: Terminal r ()
 greaterThanSignEqualsSign =
-  Earley.token GreaterThanSignEqualsSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GreaterThanSignEqualsSign)
 
-greaterThanSignGreaterThanSign :: Terminal r Token
+greaterThanSignGreaterThanSign :: Terminal r ()
 greaterThanSignGreaterThanSign =
-  Earley.token GreaterThanSignGreaterThanSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GreaterThanSignGreaterThanSign)
 
-group :: Terminal r Token
+group :: Terminal r ()
 group =
-  Earley.token GROUP
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GROUP)
 
-groups :: Terminal r Token
+groups :: Terminal r ()
 groups =
-  Earley.token GROUPS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == GROUPS)
 
-having :: Terminal r Token
+having :: Terminal r ()
 having =
-  Earley.token HAVING
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == HAVING)
 
-hyphenMinus :: Terminal r Token
+hyphenMinus :: Terminal r ()
 hyphenMinus =
-  Earley.token HyphenMinus
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == HyphenMinus)
 
 identifier :: Terminal r Text
 identifier =
   Earley.terminal \case
-    Identifier s -> Just s
+    LocatedToken (Identifier s) _ -> Just s
     _ -> Nothing
 
-if_ :: Terminal r Token
+if_ :: Terminal r ()
 if_ =
-  Earley.token IF
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == IF)
 
-ignore :: Terminal r Token
+ignore :: Terminal r ()
 ignore =
-  Earley.token IGNORE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == IGNORE)
 
 immediate :: Terminal r Token
 immediate =
-  Earley.token IMMEDIATE
+  Earley.terminal \(LocatedToken tok _) -> IMMEDIATE <$ guard (tok == IMMEDIATE)
 
-in_ :: Terminal r Token
+in_ :: Terminal r ()
 in_ =
-  Earley.token IN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == IN)
 
-index :: Terminal r Token
+index :: Terminal r ()
 index =
-  Earley.token INDEX
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == INDEX)
 
-indexed :: Terminal r Token
+indexed :: Terminal r ()
 indexed =
-  Earley.token INDEXED
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == INDEXED)
 
-initially :: Terminal r Token
+initially :: Terminal r ()
 initially =
-  Earley.token INITIALLY
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == INITIALLY)
 
-inner :: Terminal r Token
+inner :: Terminal r ()
 inner =
-  Earley.token INNER
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == INNER)
 
-intersect :: Terminal r Token
+intersect :: Terminal r ()
 intersect =
-  Earley.token INTERSECT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == INTERSECT)
 
-is :: Terminal r Token
+is :: Terminal r ()
 is =
-  Earley.token IS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == IS)
 
-isnull :: Terminal r Token
+isnull :: Terminal r ()
 isnull =
-  Earley.token ISNULL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ISNULL)
 
-join :: Terminal r Token
+join :: Terminal r ()
 join =
-  Earley.token JOIN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == JOIN)
 
-key :: Terminal r Token
+key :: Terminal r ()
 key =
-  Earley.token KEY
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == KEY)
 
-last :: Terminal r Token
+last :: Terminal r ()
 last =
-  Earley.token LAST
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LAST)
 
-left :: Terminal r Token
+left :: Terminal r ()
 left =
-  Earley.token LEFT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LEFT)
 
-leftParenthesis :: Terminal r Token
+leftParenthesis :: Terminal r ()
 leftParenthesis =
-  Earley.token LeftParenthesis
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LeftParenthesis)
 
-lessThanSign :: Terminal r Token
+lessThanSign :: Terminal r ()
 lessThanSign =
-  Earley.token LessThanSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LessThanSign)
 
-lessThanSignEqualsSign :: Terminal r Token
+lessThanSignEqualsSign :: Terminal r ()
 lessThanSignEqualsSign =
-  Earley.token LessThanSignEqualsSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LessThanSignEqualsSign)
 
-lessThanSignGreaterThanSign :: Terminal r Token
+lessThanSignGreaterThanSign :: Terminal r ()
 lessThanSignGreaterThanSign =
-  Earley.token LessThanSignGreaterThanSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LessThanSignGreaterThanSign)
 
-lessThanSignLessThanSign :: Terminal r Token
+lessThanSignLessThanSign :: Terminal r ()
 lessThanSignLessThanSign =
-  Earley.token LessThanSignLessThanSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LessThanSignLessThanSign)
 
-like :: Terminal r Token
+like :: Terminal r ()
 like =
-  Earley.token LIKE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LIKE)
 
-limit :: Terminal r Token
+limit :: Terminal r ()
 limit =
-  Earley.token LIMIT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == LIMIT)
 
-match :: Terminal r Token
+match :: Terminal r ()
 match =
-  Earley.token MATCH
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == MATCH)
 
-materialized :: Terminal r Token
+materialized :: Terminal r ()
 materialized =
-  Earley.token MATERIALIZED
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == MATERIALIZED)
 
 namedParameter :: Terminal r Text
 namedParameter =
   Earley.terminal \case
-    NamedParameter s -> Just s
+    LocatedToken (NamedParameter s) _ -> Just s
     _ -> Nothing
 
-natural :: Terminal r Token
+natural :: Terminal r ()
 natural =
-  Earley.token NATURAL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == NATURAL)
 
-no :: Terminal r Token
+no :: Terminal r ()
 no =
-  Earley.token NO
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == NO)
 
-not :: Terminal r Token
+not :: Terminal r ()
 not =
-  Earley.token NOT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == NOT)
 
-notnull :: Terminal r Token
+notnull :: Terminal r ()
 notnull =
-  Earley.token NOTNULL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == NOTNULL)
 
-null :: Terminal r Token
+null :: Terminal r ()
 null =
-  Earley.token NULL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == NULL)
 
-nulls :: Terminal r Token
+nulls :: Terminal r ()
 nulls =
-  Earley.token NULLS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == NULLS)
 
 number :: Terminal r Text
 number =
   Earley.terminal \case
-    Number s -> Just s
+    LocatedToken (Number s) _ -> Just s
     _ -> Nothing
 
-offset :: Terminal r Token
+offset :: Terminal r ()
 offset =
-  Earley.token OFFSET
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == OFFSET)
 
-on :: Terminal r Token
+on :: Terminal r ()
 on =
-  Earley.token ON
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ON)
 
-or :: Terminal r Token
+or :: Terminal r ()
 or =
-  Earley.token OR
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == OR)
 
-order :: Terminal r Token
+order :: Terminal r ()
 order =
-  Earley.token ORDER
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ORDER)
 
-others :: Terminal r Token
+others :: Terminal r ()
 others =
-  Earley.token OTHERS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == OTHERS)
 
-outer :: Terminal r Token
+outer :: Terminal r ()
 outer =
-  Earley.token OUTER
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == OUTER)
 
-over :: Terminal r Token
+over :: Terminal r ()
 over =
-  Earley.token OVER
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == OVER)
 
 parameter :: Terminal r (Maybe Natural)
 parameter =
   Earley.terminal \case
-    Parameter n -> Just n
+    LocatedToken (Parameter n) _ -> Just n
     _ -> Nothing
 
-partition :: Terminal r Token
+partition :: Terminal r ()
 partition =
-  Earley.token PARTITION
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == PARTITION)
 
-percentSign :: Terminal r Token
+percentSign :: Terminal r ()
 percentSign =
-  Earley.token PercentSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == PercentSign)
 
-plusSign :: Terminal r Token
+plusSign :: Terminal r ()
 plusSign =
-  Earley.token PlusSign
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == PlusSign)
 
-preceding :: Terminal r Token
+preceding :: Terminal r ()
 preceding =
-  Earley.token PRECEDING
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == PRECEDING)
 
-primary :: Terminal r Token
+primary :: Terminal r ()
 primary =
-  Earley.token PRIMARY
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == PRIMARY)
 
-raise :: Terminal r Token
+raise :: Terminal r ()
 raise =
-  Earley.token RAISE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == RAISE)
 
-range :: Terminal r Token
+range :: Terminal r ()
 range =
-  Earley.token RANGE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == RANGE)
 
-recursive :: Terminal r Token
+recursive :: Terminal r ()
 recursive =
-  Earley.token RECURSIVE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == RECURSIVE)
 
-references :: Terminal r Token
+references :: Terminal r ()
 references =
-  Earley.token REFERENCES
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == REFERENCES)
 
-regexp :: Terminal r Token
+regexp :: Terminal r ()
 regexp =
-  Earley.token REGEXP
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == REGEXP)
 
-rename :: Terminal r Token
+rename :: Terminal r ()
 rename =
-  Earley.token RENAME
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == RENAME)
 
-replace :: Terminal r Token
+replace :: Terminal r ()
 replace =
-  Earley.token REPLACE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == REPLACE)
 
-restrict :: Terminal r Token
+restrict :: Terminal r ()
 restrict =
-  Earley.token RESTRICT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == RESTRICT)
 
-rightParenthesis :: Terminal r Token
+rightParenthesis :: Terminal r ()
 rightParenthesis =
-  Earley.token RightParenthesis
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == RightParenthesis)
 
-rollback :: Terminal r Token
+rollback :: Terminal r ()
 rollback =
-  Earley.token ROLLBACK
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ROLLBACK)
 
-row :: Terminal r Token
+row :: Terminal r ()
 row =
-  Earley.token ROW
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ROW)
 
 rowid :: Terminal r ()
 rowid = do
   Earley.terminal \case
-    Identifier s | Text.toCaseFold s == "rowid" -> Just ()
+    LocatedToken (Identifier s) _ | Text.toCaseFold s == "rowid" -> Just ()
     _ -> Nothing
 
-rows :: Terminal r Token
+rows :: Terminal r ()
 rows =
-  Earley.token ROWS
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == ROWS)
 
-savepoint :: Terminal r Token
+savepoint :: Terminal r ()
 savepoint =
-  Earley.token SAVEPOINT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == SAVEPOINT)
 
-select :: Terminal r Token
+select :: Terminal r ()
 select =
-  Earley.token SELECT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == SELECT)
 
-set :: Terminal r Token
+set :: Terminal r ()
 set =
-  Earley.token SET
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == SET)
 
-solidus :: Terminal r Token
+solidus :: Terminal r ()
 solidus =
-  Earley.token Solidus
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == Solidus)
 
-stored :: Terminal r Token
+stored :: Terminal r ()
 stored =
-  Earley.token STORED
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == STORED)
 
 string :: Terminal r Text
 string =
   Earley.terminal \case
-    String s -> Just s
+    LocatedToken (String s) _ -> Just s
     _ -> Nothing
 
-table :: Terminal r Token
+table :: Terminal r ()
 table =
-  Earley.token TABLE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TABLE)
 
-then_ :: Terminal r Token
+then_ :: Terminal r ()
 then_ =
-  Earley.token THEN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == THEN)
 
-ties :: Terminal r Token
+ties :: Terminal r ()
 ties =
-  Earley.token TIES
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TIES)
 
-to :: Terminal r Token
+to :: Terminal r ()
 to =
-  Earley.token TO
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TO)
 
-temp :: Terminal r Token
+temp :: Terminal r ()
 temp =
-  Earley.token TEMP
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TEMP)
 
-temporary :: Terminal r Token
+temporary :: Terminal r ()
 temporary =
-  Earley.token TEMPORARY
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TEMPORARY)
 
-tilde :: Terminal r Token
+tilde :: Terminal r ()
 tilde =
-  Earley.token Tilde
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == Tilde)
 
-transaction :: Terminal r Token
+transaction :: Terminal r ()
 transaction =
-  Earley.token TRANSACTION
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TRANSACTION)
 
-true :: Terminal r Token
+true :: Terminal r ()
 true =
-  Earley.token TRUE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == TRUE)
 
-unbounded :: Terminal r Token
+unbounded :: Terminal r ()
 unbounded =
-  Earley.token UNBOUNDED
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == UNBOUNDED)
 
-union :: Terminal r Token
+union :: Terminal r ()
 union =
-  Earley.token UNION
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == UNION)
 
-unique :: Terminal r Token
+unique :: Terminal r ()
 unique =
-  Earley.token UNIQUE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == UNIQUE)
 
-update :: Terminal r Token
+update :: Terminal r ()
 update =
-  Earley.token UPDATE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == UPDATE)
 
-using :: Terminal r Token
+using :: Terminal r ()
 using =
-  Earley.token USING
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == USING)
 
-values :: Terminal r Token
+values :: Terminal r ()
 values =
-  Earley.token VALUES
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == VALUES)
 
-verticalLine :: Terminal r Token
+verticalLine :: Terminal r ()
 verticalLine =
-  Earley.token VerticalLine
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == VerticalLine)
 
-verticalLineVerticalLine :: Terminal r Token
+verticalLineVerticalLine :: Terminal r ()
 verticalLineVerticalLine =
-  Earley.token VerticalLineVerticalLine
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == VerticalLineVerticalLine)
 
-virtual :: Terminal r Token
+virtual :: Terminal r ()
 virtual =
-  Earley.token VIRTUAL
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == VIRTUAL)
 
-when :: Terminal r Token
+when :: Terminal r ()
 when =
-  Earley.token WHEN
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == WHEN)
 
-where_ :: Terminal r Token
+where_ :: Terminal r ()
 where_ =
-  Earley.token WHERE
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == WHERE)
 
-window :: Terminal r Token
+window :: Terminal r ()
 window =
-  Earley.token WINDOW
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == WINDOW)
 
-with :: Terminal r Token
+with :: Terminal r ()
 with =
-  Earley.token WITH
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == WITH)
 
-without :: Terminal r Token
+without :: Terminal r ()
 without =
-  Earley.token WITHOUT
+  Earley.terminal \(LocatedToken tok _) -> guard (tok == WITHOUT)

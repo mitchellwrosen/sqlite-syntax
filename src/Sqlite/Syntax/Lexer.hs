@@ -5,25 +5,24 @@ module Sqlite.Syntax.Lexer
 where
 
 import Control.Applicative (many, (<|>))
-import Control.Monad.Combinators (choice, optional)
-import Data.Char
-import Data.Functor
+import Control.Monad.Combinators (choice, manyTill, optional)
+import Data.Char (isAlpha, isAlphaNum, isDigit, isHexDigit, isSpace)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Read as Text.Read
+import Data.Void (Void)
 import Numeric.Natural (Natural)
-import Sqlite.Syntax.Token (Token (..))
+import Sqlite.Syntax.Token (LocatedToken (..), Token (..))
+import qualified Text.Megaparsec as Megaparsec
 import TextParser (TextParser)
 import qualified TextParser
 import Prelude hiding (exponent, lex)
 
-lex :: Text -> Either Text [Token]
+lex :: Text -> Either (Megaparsec.ParseErrorBundle Text Void) [LocatedToken]
 lex =
   TextParser.run do
     space
-    tokens <- many token
-    TextParser.eof
-    pure tokens
+    manyTill locatedTokenP TextParser.eof
 
 --
 
@@ -53,8 +52,14 @@ quoted c0 = do
 
 --
 
-token :: TextParser Token
-token =
+locatedTokenP :: TextParser LocatedToken
+locatedTokenP = do
+  offset <- TextParser.getOffset
+  token <- tokenP
+  pure (LocatedToken token offset)
+
+tokenP :: TextParser Token
+tokenP =
   choice
     [ Ampersand <$ symbol "&",
       Asterisk <$ symbol "*",

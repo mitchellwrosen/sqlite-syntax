@@ -16,39 +16,40 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Sqlite.Syntax.Lexer (lex)
-import Sqlite.Syntax.Token (Token (..))
+import Sqlite.Syntax.Token (LocatedToken (..), Token (..))
 import qualified Sqlite.Syntax.Token as Token (render)
+import qualified Text.Megaparsec as Megaparsec
 import Prelude hiding (lex)
 
 propRoundTrip :: PropertyT IO ()
 propRoundTrip = do
   tokens0 <- forAll (Gen.list (Range.linear 1 10) genToken)
   case lex (buildText (renderTokens tokens0)) of
-    Left err -> fail (Text.unpack err)
-    Right tokens1 -> tokens0 === tokens1
+    Left errorBundle -> fail (Megaparsec.errorBundlePretty errorBundle)
+    Right tokens1 -> tokens0 === map (\(LocatedToken tok _) -> tok) tokens1
 
 unitTests :: PropertyT IO ()
 unitTests = do
   -- keyword should parse as such, not an identifier
-  lex "abort" === Right [ABORT]
+  lex "abort" === Right [LocatedToken ABORT 0]
 
   -- quoted keyword is an identifier
-  lex "\"abort\"" === Right [Identifier "abort"]
-  lex "[abort]" === Right [Identifier "abort"]
-  lex "`abort`" === Right [Identifier "abort"]
+  lex "\"abort\"" === Right [LocatedToken (Identifier "abort") 0]
+  lex "[abort]" === Right [LocatedToken (Identifier "abort") 0]
+  lex "`abort`" === Right [LocatedToken (Identifier "abort") 0]
 
   -- empty identifiers are allowed
-  lex "\"\"" === Right [Identifier ""]
-  lex "[]" === Right [Identifier ""]
-  lex "``" === Right [Identifier ""]
+  lex "\"\"" === Right [LocatedToken (Identifier "") 0]
+  lex "[]" === Right [LocatedToken (Identifier "") 0]
+  lex "``" === Right [LocatedToken (Identifier "") 0]
 
   -- inside a double-quoted identifier, two double-quotes makes a single double quote
-  lex "\"  foo\"\"bar  \"" === Right [Identifier "  foo\"bar  "]
+  lex "\"  foo\"\"bar  \"" === Right [LocatedToken (Identifier "  foo\"bar  ") 0]
 
-  lex ":foo" === Right [NamedParameter "foo"]
-  lex "$foo" === Right [NamedParameter "foo"]
-  lex "@foo" === Right [NamedParameter "@foo"]
-  lex ":::foo$(bar)" === Right [NamedParameter "::foo$(bar)"]
+  lex ":foo" === Right [LocatedToken (NamedParameter "foo") 0]
+  lex "$foo" === Right [LocatedToken (NamedParameter "foo") 0]
+  lex "@foo" === Right [LocatedToken (NamedParameter "@foo") 0]
+  lex ":::foo$(bar)" === Right [LocatedToken (NamedParameter "::foo$(bar)") 0]
 
 --
 

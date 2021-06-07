@@ -6,6 +6,8 @@ module TextParser
     commit,
     run,
     --
+    getOffset,
+    --
     char,
     char_,
     char',
@@ -20,11 +22,10 @@ module TextParser
 where
 
 import Control.Applicative
-import Control.Monad (ap)
+import Control.Monad (MonadPlus (..), ap)
 import Data.Coerce (coerce)
 import Data.Functor
 import Data.Text (Text)
-import qualified Data.Text as Text
 import Data.Void (Void)
 import qualified Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Char as Megaparsec
@@ -79,6 +80,10 @@ instance MonadFail TextParser where
   fail =
     coerce @(String -> P (Result P a)) fail
 
+instance MonadPlus TextParser where
+  mzero = empty
+  mplus = (<|>)
+
 type P =
   Megaparsec.Parsec Void Text
 
@@ -101,11 +106,9 @@ commit =
   coerce @(P (Result P ())) do
     pure (Commit (pure ()))
 
-run :: forall a. TextParser a -> Text -> Either Text a
+run :: forall a. TextParser a -> Text -> Either (Megaparsec.ParseErrorBundle Text Void) a
 run parser input =
-  case Megaparsec.parse (coerce @(TextParser a) @(P (Result P a)) parser >>= runResult) "" input of
-    Left err -> Left (Text.pack (Megaparsec.errorBundlePretty err))
-    Right result -> Right result
+  Megaparsec.parse (coerce @(TextParser a) @(P (Result P a)) parser >>= runResult) "" input
 
 -- Lifted megaparsec API
 
@@ -113,6 +116,10 @@ lift :: forall a. P a -> TextParser a
 lift =
   coerce @(P a -> P (Result P a)) do
     fmap Done
+
+getOffset :: TextParser Int
+getOffset =
+  lift Megaparsec.getOffset
 
 char :: Char -> TextParser Char
 char =
