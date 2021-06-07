@@ -4,6 +4,7 @@ module Sqlite.Syntax.Internal.Parser.Utils
     commaSep1,
     parens,
     perhaps,
+    perhaps_,
   )
 where
 
@@ -38,3 +39,7 @@ parens p =
 perhaps :: Rule r a -> Rule r Bool
 perhaps p =
   choice [True <$ p, pure False]
+
+perhaps_ :: Rule r a -> Rule r ()
+perhaps_ p =
+  choice [() <$ p, pure ()]

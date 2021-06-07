@@ -11,6 +11,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.Aliased
@@ -70,10 +71,18 @@ parse parser sql =
         ([s], _) -> Right s
         (ss, _) -> Left (AmbiguousParse ss)
 
+debugParseFile :: FilePath -> IO ()
+debugParseFile path = do
+  sql <- Text.readFile ("test/files/" ++ path)
+  case parseStatement sql of
+    Left err -> Text.putStrLn (renderParseError err)
+    Right statement -> print statement
+
 renderParseError :: ParseError -> Text
 renderParseError = \case
   SyntaxError input offset -> renderError "Syntax error" input (Just offset)
-  ParseError input maybeOffset expected -> renderError ("Expected " <> Text.intercalate ", " expected) input maybeOffset
+  ParseError input maybeOffset expected ->
+    renderError ("Expected " <> Text.intercalate ", " expected) input maybeOffset
   AmbiguousParse ss -> Text.pack (show ss)
   where
     renderError :: Text -> Text -> Maybe Int -> Text
@@ -191,6 +200,7 @@ syntaxParser = mdo
             Statement'Update <$> pure TODO,
             Statement'Vacuum <$> pure TODO
           ]
+          <* perhaps_ Token.semicolon
 
   pure
     Syntax
@@ -805,15 +815,15 @@ makeIndexedColumn expression =
 literalValueRule :: Rule r LiteralValue
 literalValueRule =
   choice
-    [ -- LiteralValue'Blob <$> Token.blob,
-      -- LiteralValue'Boolean False <$ Token.false,
-      -- LiteralValue'Boolean True <$ Token.true,
-      -- LiteralValue'CurrentDate <$ Token.currentDate,
-      -- LiteralValue'CurrentTime <$ Token.currentTime,
-      -- LiteralValue'CurrentTimestamp <$ Token.currentTimestamp,
-      -- LiteralValue'Null <$ Token.null,
-      LiteralValue'Number <$> Token.number
-      -- LiteralValue'String <$> Token.string
+    [ LiteralValue'Blob <$> Token.blob,
+      LiteralValue'Boolean False <$ Token.false,
+      LiteralValue'Boolean True <$ Token.true,
+      LiteralValue'CurrentDate <$ Token.currentDate,
+      LiteralValue'CurrentTime <$ Token.currentTime,
+      LiteralValue'CurrentTimestamp <$ Token.currentTimestamp,
+      LiteralValue'Null <$ Token.null,
+      LiteralValue'Number <$> Token.number,
+      LiteralValue'String <$> Token.string
     ]
 
 namespaced :: Rule r a -> Rule r b -> Rule r (Namespaced a b)
@@ -853,7 +863,7 @@ onConflictParser =
 orderingParser :: Rule r Ordering
 orderingParser =
   choice
-    [ Ordering'Asc <$ perhaps Token.asc,
+    [ Ordering'Asc <$ perhaps_ Token.asc,
       Ordering'Desc <$ Token.desc
     ]
 

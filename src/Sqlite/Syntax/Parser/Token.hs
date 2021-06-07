@@ -921,6 +921,13 @@ select =
       LocatedToken SELECT _ -> Just ()
       _ -> Nothing
 
+semicolon :: Terminal r ()
+semicolon =
+  (<?> "a semicolon") do
+    Earley.terminal \case
+      LocatedToken Semicolon _ -> Just ()
+      _ -> Nothing
+
 set :: Terminal r ()
 set =
   (<?> "SET") do
