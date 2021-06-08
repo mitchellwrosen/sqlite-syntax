@@ -41,6 +41,7 @@ import Prelude hiding (Ordering, fail, lex, not, null)
 -- TODO make sure all of the make* things called multiple times aren't involved in mutual recursion
 -- TODO rm *Clause
 -- TODO Parser -> Rule
+-- TODO quirks page says many keywords are valid identifiers..
 
 --
 
@@ -535,15 +536,9 @@ makeExpression selectStatement windowParser = mdo
   expression10 <-
     Earley.rule do
       choice
-        [ Expression'AggregateFunctionCall
-            <$> ( AggregateFunctionCall
-                    <$> functionCallParser
-                      ( choice
-                          [ AggregateFunctionArguments'Arguments <$> perhaps Token.distinct <*> commaSep1 expression,
-                            AggregateFunctionArguments'Wildcard <$ Token.asterisk,
-                            pure AggregateFunctionArguments'None
-                          ]
-                      )
+        [ Expression'AggregateDistinctFunctionCall
+            <$> ( AggregateDistinctFunctionCallExpression
+                    <$> functionCallParser (Identity <$> (Token.distinct *> expression))
                     <*> optional filterClauseParser
                 ),
           Expression'Case <$> caseExpressionParser expression,
@@ -554,7 +549,23 @@ makeExpression selectStatement windowParser = mdo
                 ),
           Expression'Column <$> namespaced (namespaced Token.identifier Token.identifier) Token.identifier,
           Expression'Exists <$> (Token.exists *> parens selectStatement),
-          Expression'FunctionCall <$> simpleFunctionCallParser,
+          Expression'FunctionCall
+            <$> ( FunctionCallExpression
+                    <$> functionCallParser
+                      ( choice
+                          [ FunctionArguments'Arguments <$> commaSep0 expression,
+                            FunctionArguments'Wildcard <$ Token.asterisk
+                          ]
+                      )
+                    <*> optional filterClauseParser
+                    <*> optional
+                      ( Token.over
+                          *> choice
+                            [ Over'Window <$> windowParser,
+                              Over'WindowName <$> Token.identifier
+                            ]
+                      )
+                ),
           Expression'LiteralValue <$> literalValueRule,
           Expression'Parameter <$> parameterParser,
           Expression'Raise <$> raiseParser,
@@ -565,28 +576,8 @@ makeExpression selectStatement windowParser = mdo
                     <*> many (Token.comma *> expression)
                 ),
           Expression'Subquery <$> parens selectStatement,
-          Expression'WindowFunctionCall
-            <$> ( WindowFunctionCall
-                    <$> simpleFunctionCallParser
-                    <*> optional filterClauseParser
-                    <*> ( Token.over
-                            *> choice
-                              [ OverClause'Window <$> windowParser,
-                                OverClause'WindowName <$> Token.identifier
-                              ]
-                        )
-                ),
           parens expression
         ]
-
-  simpleFunctionCallParser <-
-    Earley.rule do
-      functionCallParser
-        ( choice
-            [ FunctionArguments'Arguments <$> commaSep0 expression,
-              FunctionArguments'Wildcard <$ Token.asterisk
-            ]
-        )
 
   pure expression
   where

@@ -1,7 +1,6 @@
 module Sqlite.Syntax
   ( Aliased (..),
-    AggregateFunctionArguments (..),
-    AggregateFunctionCall (..),
+    AggregateDistinctFunctionCallExpression (..),
     CaseExpression (..),
     CastExpression (..),
     CollateExpression (..),
@@ -13,6 +12,7 @@ module Sqlite.Syntax
     FrameType (..),
     FunctionArguments (..),
     FunctionCall (..),
+    FunctionCallExpression (..),
     GroupByClause (..),
     InFunctionExpression (..),
     InSubqueryExpression (..),
@@ -21,6 +21,7 @@ module Sqlite.Syntax
     LiteralValue (..),
     Named (..),
     Namespaced (..),
+    Over(..),
     Parameter (..),
     Raise (..),
     ResultColumn (..),
@@ -30,7 +31,6 @@ module Sqlite.Syntax
     SelectStatement (..),
     Table (..),
     Window (..),
-    WindowFunctionCall (..),
   )
 where
 

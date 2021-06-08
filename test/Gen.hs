@@ -9,19 +9,11 @@ import qualified Hedgehog.Range as Range
 import Sqlite.Syntax
 import Prelude
 
-genAggregateFunctionCall :: Gen AggregateFunctionCall
-genAggregateFunctionCall =
-  AggregateFunctionCall
-    <$> genFunctionCall genAggregateFunctionArguments
+genAggregateDistinctFunctionCallExpression :: Gen AggregateDistinctFunctionCallExpression
+genAggregateDistinctFunctionCallExpression =
+  AggregateDistinctFunctionCallExpression
+    <$> genFunctionCall (Identity <$> genExpression)
     <*> Gen.maybe genExpression
-
-genAggregateFunctionArguments :: Gen (AggregateFunctionArguments Expression)
-genAggregateFunctionArguments =
-  Gen.choice
-    [ pure AggregateFunctionArguments'None,
-      pure AggregateFunctionArguments'Wildcard,
-      AggregateFunctionArguments'Arguments <$> Gen.bool <*> Gen.nonEmpty (Range.linear 1 5) genExpression
-    ]
 
 genCaseExpression :: Gen CaseExpression
 genCaseExpression =
@@ -39,16 +31,15 @@ genExpression =
       Expression'Parameter <$> genParameter,
       Expression'Raise <$> genRaise
     ]
-    [ Expression'AggregateFunctionCall <$> genAggregateFunctionCall,
+    [ Expression'AggregateDistinctFunctionCall <$> genAggregateDistinctFunctionCallExpression,
       Expression'Case <$> genCaseExpression,
       Expression'Exists <$> genSelectStatement,
-      Expression'FunctionCall <$> genFunctionCall genFunctionArguments,
+      Expression'FunctionCall <$> genFunctionCallExpression,
       Expression'Glob <$> genExpression <*> genExpression <*> Gen.maybe genExpression,
       Expression'Like <$> genExpression <*> genExpression <*> Gen.maybe genExpression,
       Expression'Match <$> genExpression <*> genExpression <*> Gen.maybe genExpression,
       Expression'Regexp <$> genExpression <*> genExpression <*> Gen.maybe genExpression,
       Expression'Subquery <$> genSelectStatement,
-      Expression'WindowFunctionCall <$> genWindowFunctionCall,
       Gen.subterm genExpression Expression'BitwiseNegate,
       Gen.subtermM genExpression \expression ->
         (\type_ -> Expression'Cast (CastExpression expression type_)) <$> genIdentifier,
@@ -104,6 +95,13 @@ genFunctionCall gen =
     <$> genNamespaced genIdentifier genIdentifier
     <*> gen
 
+genFunctionCallExpression :: Gen FunctionCallExpression
+genFunctionCallExpression =
+  FunctionCallExpression
+    <$> genFunctionCall genFunctionArguments
+    <*> Gen.maybe genExpression
+    <*> Gen.maybe genOver
+
 genGroupByClause :: Gen GroupByClause
 genGroupByClause =
   GroupByClause
@@ -131,6 +129,9 @@ genIdentifier =
 genNamespaced :: Gen a -> Gen b -> Gen (Namespaced a b)
 genNamespaced g1 g2 =
   Namespaced <$> Gen.maybe g1 <*> g2
+
+genOver :: Gen Over
+genOver = undefined
 
 genParameter :: Gen Parameter
 genParameter = undefined
@@ -166,6 +167,3 @@ genSelectStatement = undefined
 
 genTable :: Gen Table
 genTable = undefined
-
-genWindowFunctionCall :: Gen WindowFunctionCall
-genWindowFunctionCall = undefined
