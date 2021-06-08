@@ -118,6 +118,6 @@ data Table
 data WithClause = WithClause
   { -- | @RECURSIVE@
     recursive :: Bool,
-    commonTableExpressions :: NonEmpty CommonTableExpression
+    tables :: NonEmpty CommonTableExpression
   }
   deriving stock (Eq, Generic, Show)

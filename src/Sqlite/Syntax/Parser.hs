@@ -137,7 +137,7 @@ data Syntax r = Syntax
 syntaxParser :: forall r. Earley.Grammar r (Syntax r)
 syntaxParser = mdo
   columnDefinitionParser <- Earley.rule (makeColumnDefinitionParser expressionParser)
-  expressionParser <- makeExpression selectStatementParser windowParser
+  expressionParser <- makeExpressionRule selectStatementParser windowParser
   indexedColumnParser <- Earley.rule (makeIndexedColumn expressionParser)
   orderingTermParser <- Earley.rule (makeOrderingTermParser expressionParser)
   selectStatementParser <-
@@ -511,8 +511,8 @@ data Default
   | Default'SignedNumber SignedNumber
   deriving stock (Eq, Generic, Show)
 
-makeExpression :: Rule r SelectStatement -> Rule r Window -> Earley.Grammar r (Rule r Expression)
-makeExpression selectStatement windowParser = mdo
+makeExpressionRule :: Rule r SelectStatement -> Rule r Window -> Earley.Grammar r (Rule r Expression)
+makeExpressionRule selectStatement windowParser = mdo
   filterClauseParser <- Earley.rule (Token.filter *> parens (Token.where_ *> expression))
 
   expression <-
@@ -1044,9 +1044,10 @@ makeSelectStatementParser expressionParser orderingTermParser windowParser = mdo
               Table'Function
                 <$> ( Aliased
                         <$> functionCallParser (commaSep1 expressionParser)
-                        <*> optional (Token.as *> Token.identifier)
+                        <*> optional (perhaps_ Token.as *> Token.identifier)
                     ),
-              Table'Subquery <$> (Aliased <$> parens selectStatementParser <*> optional (Token.as *> Token.identifier)),
+              Table'Subquery
+                <$> (Aliased <$> parens selectStatementParser <*> optional (perhaps_ Token.as *> Token.identifier)),
               parens tableParser
             ]
       pure tableParser

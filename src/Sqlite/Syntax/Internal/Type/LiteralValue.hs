@@ -7,6 +7,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Prelude
 
+-- TODO rename to Literal
 data LiteralValue
   = LiteralValue'Blob Text
   | LiteralValue'Boolean Bool
