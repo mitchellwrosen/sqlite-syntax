@@ -1,9 +1,13 @@
 module Sqlite.Syntax
-  ( Aliased (..),
+  ( Action (..),
     AggregateDistinctFunctionCallExpression (..),
+    Aliased (..),
     CaseExpression (..),
     CastExpression (..),
     CollateExpression (..),
+    CommonTableExpression (..),
+    CommonTableExpressions (..),
+    CompoundSelect (..),
     Expression (..),
     ForeignKeyClause (..),
     Frame (..),
@@ -13,17 +17,25 @@ module Sqlite.Syntax
     FunctionArguments (..),
     FunctionCall (..),
     FunctionCallExpression (..),
-    GroupByClause (..),
+    GroupBy (..),
     InFunctionExpression (..),
     InSubqueryExpression (..),
     InTableExpression (..),
     InValuesExpression (..),
+    IndexedColumn (..),
+    JoinConstraint (..),
+    Limit (..),
     LiteralValue (..),
     Named (..),
     Namespaced (..),
-    Over(..),
+    NullsPlacement (..),
+    Ordering (..),
+    OrderingTerm (..),
+    Over (..),
     Parameter (..),
+    QualifiedTableName (..),
     Raise (..),
+    Reference (..),
     ResultColumn (..),
     RowValue (..),
     Select (..),
@@ -38,8 +50,12 @@ import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
+import Sqlite.Syntax.Internal.Type.IndexedColumn
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
 import Sqlite.Syntax.Internal.Type.Namespaced
+import Sqlite.Syntax.Internal.Type.Ordering
+import Sqlite.Syntax.Internal.Type.OrderingTerm
+import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Window

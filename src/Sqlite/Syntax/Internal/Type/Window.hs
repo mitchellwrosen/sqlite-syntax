@@ -1,9 +1,9 @@
 module Sqlite.Syntax.Internal.Type.Window where
 
+import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import Data.Functor.Identity (Identity)
 import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression (Expression)
 import Sqlite.Syntax.Internal.Type.OrderingTerm (OrderingTerm)
 import Prelude
@@ -18,25 +18,26 @@ data Frame = Frame
   deriving stock (Eq, Generic, Show)
 
 data FrameBoundary f g
-  = FrameBoundary'CurrentRow
-  | FrameBoundary'Following (f Expression)
-  | FrameBoundary'Preceding (g Expression)
+  = CurrentRow
+  | Following (f Expression)
+  | Preceding (g Expression)
   deriving stock (Generic)
 
 deriving instance (Eq (f Expression), Eq (g Expression)) => Eq (FrameBoundary f g)
+
 deriving instance (Show (f Expression), Show (g Expression)) => Show (FrameBoundary f g)
 
 data FrameExclude
-  = FrameExclude'CurrentRow
-  | FrameExclude'Group
-  | FrameExclude'NoOthers
-  | FrameExclude'Ties
+  = ExcludeCurrentRow
+  | ExcludeGroup
+  | ExcludeNoOthers
+  | ExcludeTies
   deriving stock (Eq, Generic, Show)
 
 data FrameType
-  = FrameType'Groups
-  | FrameType'Range
-  | FrameType'Rows
+  = Groups
+  | Range
+  | Rows
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/window-defn.html

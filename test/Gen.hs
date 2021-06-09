@@ -102,23 +102,23 @@ genFunctionCallExpression =
     <*> Gen.maybe genExpression
     <*> Gen.maybe genOver
 
-genGroupByClause :: Gen GroupByClause
-genGroupByClause =
-  GroupByClause
+genGroupBy :: Gen GroupBy
+genGroupBy =
+  GroupBy
     <$> Gen.nonEmpty (Range.linear 1 5) genExpression
     <*> Gen.maybe genExpression
 
 genLiteralValue :: Gen LiteralValue
 genLiteralValue =
   Gen.choice
-    [ pure LiteralValue'Null,
-      LiteralValue'Boolean <$> Gen.bool,
-      pure LiteralValue'CurrentDate,
-      pure LiteralValue'CurrentTime,
-      pure LiteralValue'CurrentTimestamp,
-      LiteralValue'Number <$> Gen.element ["1", "1.0"],
-      LiteralValue'Blob <$> Gen.element ["00", "01"],
-      LiteralValue'String <$> Gen.element ["foo", "bar"]
+    [ pure Null,
+      Boolean <$> Gen.bool,
+      pure CurrentDate,
+      pure CurrentTime,
+      pure CurrentTimestamp,
+      Number <$> Gen.element ["1", "1.0"],
+      Blob <$> Gen.element ["00", "01"],
+      String <$> Gen.element ["foo", "bar"]
     ]
 
 -- TODO better generator
@@ -156,7 +156,7 @@ genSelect =
     <*> Gen.nonEmpty (Range.linear 1 5) genResultColumn
     <*> Gen.maybe genTable
     <*> Gen.maybe genExpression
-    <*> Gen.maybe genGroupByClause
+    <*> Gen.maybe genGroupBy
     <*> Gen.maybe genWindow
   where
     genWindow :: Gen (NonEmpty (Aliased Identity Window))

@@ -21,10 +21,10 @@ module TextParser
   )
 where
 
-import Control.Applicative
+import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus (..), ap)
 import Data.Coerce (coerce)
-import Data.Functor
+import Data.Functor (void)
 import Data.Text (Text)
 import Data.Void (Void)
 import qualified Text.Megaparsec as Megaparsec

@@ -9,6 +9,10 @@ import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression (Expression)
 import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Prelude
 
+-- |
+-- @
+-- ∙(∙)
+-- @
 data FunctionCall f = FunctionCall
   { name :: Namespaced Text Text,
     arguments :: f Expression

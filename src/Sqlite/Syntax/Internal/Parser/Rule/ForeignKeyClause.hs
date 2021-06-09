@@ -23,16 +23,16 @@ foreignKeyClauseRule =
   where
     fromActions :: [Maybe (Either Action Action)] -> (Action, Action)
     fromActions =
-      foldr (\x (y, z) -> maybe (y, z) (either (,z) (y,)) x) (Action'NoAction, Action'NoAction)
+      foldr (\x (y, z) -> maybe (y, z) (either (,z) (y,)) x) (NoAction, NoAction)
 
 actionRule :: Rule r Action
 actionRule =
   choice
-    [ Action'Cascade <$ Token.cascade,
-      Action'NoAction <$ (Token.no *> Token.action),
-      Action'Restrict <$ Token.restrict,
-      Action'SetDefault <$ (Token.set *> Token.default_),
-      Action'SetNull <$ (Token.set *> Token.null)
+    [ Cascade <$ Token.cascade,
+      NoAction <$ (Token.no *> Token.action),
+      Restrict <$ Token.restrict,
+      SetDefault <$ (Token.set *> Token.default_),
+      SetNull <$ (Token.set *> Token.null)
     ]
 
 actionClauseRule :: Rule r (Maybe (Either Action Action))

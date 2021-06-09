@@ -4,7 +4,7 @@ module Sqlite.Syntax.Internal.Parser.Rule.Table
   )
 where
 
-import Control.Applicative hiding (some)
+import Control.Applicative (optional)
 import Control.Applicative.Combinators (choice)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
@@ -67,8 +67,8 @@ makeTableRule expressionRule selectStatementRule = mdo
     joinConstraintRule :: Rule r JoinConstraint
     joinConstraintRule =
       choice
-        [ JoinConstraint'On <$> (Token.on *> expressionRule),
-          JoinConstraint'Using <$> (Token.using *> parens (commaSep1 Token.identifier))
+        [ On <$> (Token.on *> expressionRule),
+          Using <$> (Token.using *> parens (commaSep1 Token.identifier))
         ]
 
 qualifiedTableNameRule :: Rule r QualifiedTableName

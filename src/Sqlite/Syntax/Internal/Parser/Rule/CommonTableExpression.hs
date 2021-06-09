@@ -11,9 +11,9 @@ import Sqlite.Syntax.Internal.Type.SelectStatement
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Prelude hiding (Ordering, fail, lex, not, null)
 
-makeCommonTableExpressionsRule :: forall r. Rule r SelectStatement -> Rule r WithClause
+makeCommonTableExpressionsRule :: forall r. Rule r SelectStatement -> Rule r CommonTableExpressions
 makeCommonTableExpressionsRule selectStatementRule =
-  WithClause <$> (Token.with *> perhaps Token.recursive) <*> commaSep1 commonTableExpressionRule
+  CommonTableExpressions <$> (Token.with *> perhaps Token.recursive) <*> commaSep1 commonTableExpressionRule
   where
     commonTableExpressionRule :: Rule r CommonTableExpression
     commonTableExpressionRule =

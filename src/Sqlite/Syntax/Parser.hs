@@ -2,7 +2,7 @@
 -- TODO move types out
 module Sqlite.Syntax.Parser where
 
-import Control.Applicative hiding (some)
+import Control.Applicative (many, optional)
 import Control.Applicative.Combinators (choice)
 import Control.Applicative.Combinators.NonEmpty (some)
 import Data.Functor.Identity (Identity (..))
@@ -18,6 +18,7 @@ import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
+import Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn (indexedColumnRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
@@ -26,9 +27,11 @@ import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
+import Sqlite.Syntax.Internal.Type.IndexedColumn
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
 import Sqlite.Syntax.Internal.Type.Namespaced
+import Sqlite.Syntax.Internal.Type.Ordering
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Window
@@ -231,7 +234,7 @@ syntaxParser = mdo
       where
         defaultFrame :: Frame
         defaultFrame =
-          Frame FrameType'Range (FrameBoundary'Preceding Nothing) FrameBoundary'CurrentRow FrameExclude'NoOthers
+          Frame Range (Preceding Nothing) CurrentRow ExcludeNoOthers
 
         frameParser :: Rule r Frame
         frameParser =
@@ -239,9 +242,9 @@ syntaxParser = mdo
               Frame {type_, startingBoundary, endingBoundary, exclude}
           )
             <$> choice
-              [ FrameType'Groups <$ Token.groups,
-                FrameType'Range <$ Token.range,
-                FrameType'Rows <$ Token.rows
+              [ Groups <$ Token.groups,
+                Range <$ Token.range,
+                Rows <$ Token.rows
               ]
             <*> frameBoundariesParser
             <*> frameExcludeParser
@@ -266,39 +269,39 @@ syntaxParser = mdo
                                 exprPrecedingParser Identity
                               ]
                         ),
-                  (,FrameBoundary'CurrentRow) <$> currentRowParser,
-                  (,FrameBoundary'CurrentRow) <$> unboundedPrecedingParser,
-                  (,FrameBoundary'CurrentRow) <$> exprPrecedingParser Just
+                  (,CurrentRow) <$> currentRowParser,
+                  (,CurrentRow) <$> unboundedPrecedingParser,
+                  (,CurrentRow) <$> exprPrecedingParser Just
                 ]
               where
                 currentRowParser :: Rule r (FrameBoundary f g)
                 currentRowParser =
-                  FrameBoundary'CurrentRow <$ (Token.current *> Token.row)
+                  CurrentRow <$ (Token.current *> Token.row)
 
                 exprFollowingParser :: (Expression -> f Expression) -> Rule r (FrameBoundary f g)
                 exprFollowingParser f =
-                  (FrameBoundary'Following . f) <$> (expressionRule <* Token.following)
+                  (Following . f) <$> (expressionRule <* Token.following)
 
                 exprPrecedingParser :: (Expression -> g Expression) -> Rule r (FrameBoundary f g)
                 exprPrecedingParser f =
-                  (FrameBoundary'Preceding . f) <$> (expressionRule <* Token.preceding)
+                  (Preceding . f) <$> (expressionRule <* Token.preceding)
 
                 unboundedFollowingParser :: Rule r (FrameBoundary Maybe g)
                 unboundedFollowingParser =
-                  FrameBoundary'Following Nothing <$ (Token.unbounded *> Token.following)
+                  Following Nothing <$ (Token.unbounded *> Token.following)
 
                 unboundedPrecedingParser :: Rule r (FrameBoundary f Maybe)
                 unboundedPrecedingParser =
-                  FrameBoundary'Preceding Nothing <$ (Token.unbounded *> Token.preceding)
+                  Preceding Nothing <$ (Token.unbounded *> Token.preceding)
 
             frameExcludeParser :: Rule r FrameExclude
             frameExcludeParser =
               choice
-                [ FrameExclude'CurrentRow <$ (Token.exclude *> Token.current *> Token.row),
-                  FrameExclude'Group <$ (Token.exclude *> Token.group),
-                  FrameExclude'NoOthers <$ (Token.exclude *> Token.no *> Token.others),
-                  FrameExclude'Ties <$ (Token.exclude *> Token.ties),
-                  pure FrameExclude'NoOthers
+                [ ExcludeCurrentRow <$ (Token.exclude *> Token.current *> Token.row),
+                  ExcludeGroup <$ (Token.exclude *> Token.group),
+                  ExcludeNoOthers <$ (Token.exclude *> Token.no *> Token.others),
+                  ExcludeTies <$ (Token.exclude *> Token.ties),
+                  pure ExcludeNoOthers
                 ]
 
 data Statement
@@ -629,8 +632,8 @@ makeExpressionRule selectStatement windowParser = mdo
           <$> e1
           <*> (Token.is *> perhaps Token.not)
           <*> e2,
-        (\x0 -> Expression'Is x0 (Expression'LiteralValue LiteralValue'Null)) <$> e1 <* Token.isnull,
-        (\x0 -> Expression'Not (Expression'Is x0 (Expression'LiteralValue LiteralValue'Null)))
+        (\x0 -> Expression'Is x0 (Expression'LiteralValue Null)) <$> e1 <* Token.isnull,
+        (\x0 -> Expression'Not (Expression'Is x0 (Expression'LiteralValue Null)))
           <$> e1
           <* choice [Token.not *> Token.null, Token.notnull],
         (\x0 not_ x1 x2 -> (if not_ then Expression'Not else id) (Expression'Like x0 x1 x2))
@@ -707,7 +710,7 @@ makeExpressionRule selectStatement windowParser = mdo
         <*> some ((,) <$> (Token.when *> expressionRule) <*> (Token.then_ *> expressionRule))
         <*> choice
           [ Token.else_ *> expressionRule,
-            pure (Expression'LiteralValue LiteralValue'Null)
+            pure (Expression'LiteralValue Null)
           ]
         <* Token.end
 
@@ -730,51 +733,27 @@ generatedType =
       GeneratedType'Virtual <$ Token.virtual
     ]
 
--- | https://sqlite.org/syntax/indexed-column.html
---
--- From https://sqlite.org/lang_createtable.html:
---
---   * The PRIMARY KEY clause must contain only column names — the use of expressions in an indexed-column of a PRIMARY
---     KEY is not supported.
---
---   * As with PRIMARY KEYs, a UNIQUE table-constraint clause must contain only column names — the use of expressions in
---     an indexed-column of a UNIQUE table-constraint is not supported.
-data IndexedColumn = IndexedColumn
-  { column :: Text,
-    collation :: Maybe Text,
-    ordering :: Ordering
-  }
-  deriving stock (Eq, Generic, Show)
-
--- | https://sqlite.org/syntax/indexed-column.html
-indexedColumnRule :: Rule r IndexedColumn
-indexedColumnRule =
-  IndexedColumn
-    <$> Token.identifier
-    <*> optional (Token.collate *> Token.identifier)
-    <*> orderingRule
-
 literalValueRule :: Rule r LiteralValue
 literalValueRule =
   choice
-    [ LiteralValue'Blob <$> Token.blob,
-      LiteralValue'Boolean False <$ Token.false,
-      LiteralValue'Boolean True <$ Token.true,
-      LiteralValue'CurrentDate <$ Token.currentDate,
-      LiteralValue'CurrentTime <$ Token.currentTime,
-      LiteralValue'CurrentTimestamp <$ Token.currentTimestamp,
-      LiteralValue'Null <$ Token.null,
-      LiteralValue'Number <$> Token.number,
-      LiteralValue'String <$> Token.string
+    [ Blob <$> Token.blob,
+      Boolean False <$ Token.false,
+      Boolean True <$ Token.true,
+      CurrentDate <$ Token.currentDate,
+      CurrentTime <$ Token.currentTime,
+      CurrentTimestamp <$ Token.currentTimestamp,
+      Null <$ Token.null,
+      Number <$> Token.number,
+      String <$> Token.string
     ]
 
 -- | https://sqlite.org/syntax/conflict-clause.html
 data OnConflict
-  = OnConflict'Abort
-  | OnConflict'Fail
-  | OnConflict'Ignore
-  | OnConflict'Replace
-  | OnConflict'Rollback
+  = OnConflictAbort
+  | OnConflictFail
+  | OnConflictIgnore
+  | OnConflictReplace
+  | OnConflictRollback
   deriving stock (Eq, Generic, Show)
 
 onConflictParser :: Rule r OnConflict
@@ -782,11 +761,11 @@ onConflictParser =
   Token.on
     *> Token.conflict
     *> choice
-      [ OnConflict'Abort <$ Token.abort,
-        OnConflict'Fail <$ Token.fail,
-        OnConflict'Ignore <$ Token.ignore,
-        OnConflict'Replace <$ Token.replace,
-        OnConflict'Rollback <$ Token.rollback
+      [ OnConflictAbort <$ Token.abort,
+        OnConflictFail <$ Token.fail,
+        OnConflictIgnore <$ Token.ignore,
+        OnConflictReplace <$ Token.replace,
+        OnConflictRollback <$ Token.rollback
       ]
 
 raiseParser :: Rule r Raise
@@ -820,7 +799,7 @@ makeReturningClauseItem = undefined
 
 makeSelectStatementParser ::
   forall r.
-  Rule r WithClause ->
+  Rule r CommonTableExpressions ->
   Rule r Expression ->
   Rule r OrderingTerm ->
   Rule r Table ->
@@ -834,11 +813,11 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
         <$> optional commonTableExpressionsRule
         <*> compoundSelectParser
         <*> optional (Token.order *> Token.by *> commaSep1 orderingTermParser)
-        <*> optional limitClauseParser
+        <*> optional limitRule
   pure selectStatementRule
   where
-    limitClauseParser :: Rule r LimitClause
-    limitClauseParser =
+    limitRule :: Rule r Limit
+    limitRule =
       munge
         <$> (Token.limit *> expressionRule)
         <*> optional
@@ -848,14 +827,14 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
               ]
           )
       where
-        munge :: Expression -> Maybe (Either Expression Expression) -> LimitClause
+        munge :: Expression -> Maybe (Either Expression Expression) -> Limit
         munge e1 = \case
           -- LIMIT x
-          Nothing -> LimitClause e1 Nothing
+          Nothing -> Limit e1 Nothing
           -- LIMIT x OFFSET y
-          Just (Left e2) -> LimitClause e1 (Just e2)
+          Just (Left e2) -> Limit e1 (Just e2)
           -- LIMIT y, x
-          Just (Right e2) -> LimitClause e2 (Just e1)
+          Just (Right e2) -> Limit e2 (Just e1)
 
     makeCompoundSelectParser :: Rule r Table -> Earley.Grammar r (Rule r CompoundSelect)
     makeCompoundSelectParser tableParser = mdo
@@ -863,10 +842,10 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
         Earley.rule do
           choice
             [ CompoundSelect <$> selectCoreParser,
-              CompoundSelect'Except <$> compoundSelectParser <*> (Token.except *> selectCoreParser),
-              CompoundSelect'Intersect <$> compoundSelectParser <*> (Token.intersect *> selectCoreParser),
-              CompoundSelect'Union <$> compoundSelectParser <*> (Token.union *> selectCoreParser),
-              CompoundSelect'UnionAll <$> compoundSelectParser <*> (Token.union *> Token.all *> selectCoreParser)
+              Except <$> compoundSelectParser <*> (Token.except *> selectCoreParser),
+              Intersect <$> compoundSelectParser <*> (Token.intersect *> selectCoreParser),
+              Union <$> compoundSelectParser <*> (Token.union *> selectCoreParser),
+              UnionAll <$> compoundSelectParser <*> (Token.union *> Token.all *> selectCoreParser)
             ]
       selectParser <-
         Earley.rule do
@@ -875,7 +854,7 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
             <*> commaSep1 resultColumnRule
             <*> optional (Token.from *> tableParser)
             <*> optional (Token.where_ *> expressionRule)
-            <*> optional groupByClauseParser
+            <*> optional groupByRule
             <*> optional windowClauseParser
       selectCoreParser <-
         Earley.rule do
@@ -894,9 +873,9 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
                 False <$ Token.all,
                 pure False
               ]
-        groupByClauseParser :: Rule r GroupByClause
-        groupByClauseParser =
-          GroupByClause
+        groupByRule :: Rule r GroupBy
+        groupByRule =
+          GroupBy
             <$> (Token.group *> Token.by *> commaSep1 expressionRule)
             <*> optional (Token.having *> expressionRule)
         resultColumnRule :: Rule r ResultColumn

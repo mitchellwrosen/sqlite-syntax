@@ -3,16 +3,15 @@ module Sqlite.Syntax.Internal.Parser.Rule.Ordering
   )
 where
 
-import Control.Applicative hiding (some)
 import Control.Applicative.Combinators (choice)
 import Sqlite.Syntax.Internal.Parser.Utils
-import Sqlite.Syntax.Internal.Type.OrderingTerm
+import Sqlite.Syntax.Internal.Type.Ordering (Ordering (..))
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Prelude hiding (Ordering)
 
 orderingRule :: Rule r Ordering
 orderingRule =
   choice
-    [ Ordering'Asc <$ perhaps_ Token.asc,
-      Ordering'Desc <$ Token.desc
+    [ Ascending <$ perhaps_ Token.asc,
+      Descending <$ Token.desc
     ]

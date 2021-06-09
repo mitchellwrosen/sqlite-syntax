@@ -14,89 +14,134 @@ import Sqlite.Syntax.Internal.Type.Window
 import Prelude hiding (Ordering, fail, not, null)
 
 -- | https://sqlite.org/syntax/common-table-expression.html
+--
+-- @
+-- __table__ [(__column__+)] /AS/ [[/NOT/] /MATERIALIZED/] (__select-statement__)
+-- @
 data CommonTableExpression = CommonTableExpression
   { table :: Text,
     columns :: Maybe (NonEmpty Text),
-    -- | @AS [NOT] MATERIALIZED@
     materialized :: Maybe Bool,
     select :: SelectStatement
   }
   deriving stock (Eq, Generic, Show)
 
-data CompoundSelect
-  = CompoundSelect SelectCore
-  | -- | @... EXCEPT ...@
-    CompoundSelect'Except CompoundSelect SelectCore
-  | -- | @... INTERSECT ...@
-    CompoundSelect'Intersect CompoundSelect SelectCore
-  | -- | @... UNION ...@
-    CompoundSelect'Union CompoundSelect SelectCore
-  | -- | @... UNION ALL ...@
-    CompoundSelect'UnionAll CompoundSelect SelectCore
+-- |
+-- @
+-- /WITH/ [/RECURSIVE/] __common-table-expression__+
+-- @
+--
+-- TODO move
+data CommonTableExpressions = CommonTableExpressions
+  { recursive :: Bool,
+    tables :: NonEmpty CommonTableExpression
+  }
   deriving stock (Eq, Generic, Show)
 
-data GroupByClause = GroupByClause
-  { -- | @GROUP BY ...@
-    groupBy :: NonEmpty Expression,
-    -- | @HAVING ...@
+-- |
+--
+-- @
+-- __select-core__
+-- __compound-select__ /EXCEPT/ __select-core__
+-- __compound-select__ /INTERSECT/ __select-core__
+-- __compound-select__ /UNION/ __select-core__
+-- __compound-select__ /UNION ALL/ __select-core__
+-- @
+--
+-- idea: use this type internally for Earley parsing, but then convert to simpler recursive tree structure after?
+data CompoundSelect
+  = -- | TODO rename constructor
+    CompoundSelect SelectCore
+  | Except CompoundSelect SelectCore
+  | Intersect CompoundSelect SelectCore
+  | Union CompoundSelect SelectCore
+  | UnionAll CompoundSelect SelectCore
+  deriving stock (Eq, Generic, Show)
+
+-- |
+-- @
+-- /GROUP BY/ __expression__+ [/HAVING/ expression]
+-- @
+data GroupBy = GroupBy
+  { groupBy :: NonEmpty Expression,
     having :: Maybe Expression
   }
   deriving stock (Eq, Generic, Show)
 
 -- | https://www.sqlite.org/syntax/join-constraint.html
+--
+-- @
+-- /ON/ __expression__
+-- /USING/ __column__+
+-- @
 data JoinConstraint
-  = -- | @ON ...@
-    JoinConstraint'On Expression
-  | -- | @USING ...@
-    JoinConstraint'Using (NonEmpty Text)
+  = On Expression
+  | Using (NonEmpty Text)
   deriving stock (Eq, Generic, Show)
 
-data LimitClause = LimitClause
-  { -- | @LIMIT ...@
-    limit :: Expression,
-    -- | @OFFSET ...@
+-- |
+-- @
+-- /LIMIT/ __expression__ [/OFFSET/ __expression__]
+-- @
+data Limit = Limit
+  { limit :: Expression,
     offset :: Maybe Expression
   }
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/result-column.html
+--
+-- @
+-- __expression__ [/AS/] __column__
+-- [__table__.]__*__
+-- @
 data ResultColumn
   = ResultColumn'Expression (Aliased Maybe Expression)
   | ResultColumn'Wildcard (Namespaced Text ())
   deriving stock (Eq, Generic, Show)
 
+-- |
+-- @
+-- /SELECT/ [/DISTINCT/] __result-column__+
+--   [/FROM/ __table_]
+--   [/WHERE/ __expression__]
+--   [/GROUP BY/ __group-by__]
+--   [/WINDOW/ __window__+]
+-- @
 data Select = Select
-  { -- | @DISTINCT@
-    distinct :: Bool,
+  { distinct :: Bool,
     columns :: NonEmpty ResultColumn,
-    -- | @FROM ...@
     from :: Maybe Table,
-    -- | @WHERE ...@
     where_ :: Maybe Expression,
-    -- | @GROUP BY ...@
-    groupBy :: Maybe GroupByClause,
+    groupBy :: Maybe GroupBy,
     window :: Maybe (NonEmpty (Aliased Identity Window))
   }
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/select-core.html
+--
+-- @
+-- /SELECT/ __select__
+-- /VALUES/ (__expression__+)+
+-- @
 data SelectCore
-  = -- | @SELECT ...@
-    SelectCore'Select Select
-  | -- | @VALUES ...@
-    SelectCore'Values (NonEmpty (NonEmpty Expression))
+  = SelectCore'Select Select
+  | SelectCore'Values (NonEmpty (NonEmpty Expression))
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/select-stmt.html
+--
+-- @
+-- [__common-table-expressions__]
+--   __compound-select__
+--   [/ORDER BY/ __ordering-term__+]
+--   [__limit__]
+-- @
 data SelectStatement = SelectStatement
-  { -- | @WITH ...@
-    with :: Maybe WithClause,
-    -- | @SELECT ...@
+  { with :: Maybe CommonTableExpressions,
     select :: CompoundSelect,
-    -- | @ORDER BY ...@
     orderBy :: Maybe (NonEmpty OrderingTerm),
-    -- | @LIMIT ...@
-    limit :: Maybe LimitClause
+    limit :: Maybe Limit
   }
   deriving stock (Eq, Generic, Show)
 
@@ -113,12 +158,4 @@ data Table
   | Table'NaturalInnerJoin Table Table
   | Table'NaturalLeftOuterJoin Table Table
   | Table'Subquery (Aliased Maybe SelectStatement)
-  deriving stock (Eq, Generic, Show)
-
--- TODO rename to CommonTableExpressions, move
-data WithClause = WithClause
-  { -- | @RECURSIVE@
-    recursive :: Bool,
-    tables :: NonEmpty CommonTableExpression
-  }
   deriving stock (Eq, Generic, Show)

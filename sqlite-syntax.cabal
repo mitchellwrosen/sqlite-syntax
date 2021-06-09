@@ -59,6 +59,7 @@ library
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause
     Sqlite.Syntax.Internal.Parser.Rule.FunctionCall
+    Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn
     Sqlite.Syntax.Internal.Parser.Rule.Namespaced
     Sqlite.Syntax.Internal.Parser.Rule.Ordering
     Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm
@@ -68,9 +69,11 @@ library
     Sqlite.Syntax.Internal.Type.Expression
     Sqlite.Syntax.Internal.Type.ForeignKeyClause
     Sqlite.Syntax.Internal.Type.FunctionCall
+    Sqlite.Syntax.Internal.Type.IndexedColumn
     Sqlite.Syntax.Internal.Type.LiteralValue
     Sqlite.Syntax.Internal.Type.Named
     Sqlite.Syntax.Internal.Type.Namespaced
+    Sqlite.Syntax.Internal.Type.Ordering
     Sqlite.Syntax.Internal.Type.OrderingTerm
     Sqlite.Syntax.Internal.Type.QualifiedTableName
     Sqlite.Syntax.Internal.Type.SelectStatement

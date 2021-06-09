@@ -8,7 +8,7 @@ module Sqlite.Syntax.Internal.Parser.Utils
   )
 where
 
-import Control.Applicative hiding (some)
+import Control.Applicative (many)
 import Control.Applicative.Combinators (choice)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty

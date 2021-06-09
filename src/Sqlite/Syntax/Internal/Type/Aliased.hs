@@ -7,6 +7,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Prelude
 
+-- | A value aliased with a name, e.g. @table AS name@.
 data Aliased f a = Aliased
   { value :: a,
     alias :: f Text

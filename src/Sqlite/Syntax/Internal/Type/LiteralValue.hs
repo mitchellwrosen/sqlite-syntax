@@ -9,16 +9,16 @@ import Prelude
 
 -- TODO rename to Literal
 data LiteralValue
-  = LiteralValue'Blob Text
-  | LiteralValue'Boolean Bool
-  | -- | @CURRENT_DATE@
-    LiteralValue'CurrentDate
-  | -- | @CURRENT_TIME@
-    LiteralValue'CurrentTime
-  | -- | @CURRENT_TIMESTAMP@
-    LiteralValue'CurrentTimestamp
-  | -- | @NULL@
-    LiteralValue'Null
-  | LiteralValue'Number Text
-  | LiteralValue'String Text
+  = Blob Text
+  | Boolean Bool
+  | -- | /CURRENT_DATE/
+    CurrentDate
+  | -- | /CURRENT_TIME/
+    CurrentTime
+  | -- | /CURRENT_TIMESTAMP/
+    CurrentTimestamp
+  | -- | /NULL/
+    Null
+  | Number Text
+  | String Text
   deriving stock (Eq, Generic, Show)
