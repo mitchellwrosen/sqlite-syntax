@@ -28,6 +28,6 @@ data OrderingTerm = OrderingTerm
   { expression :: Expression,
     collation :: Maybe Text,
     ordering :: Ordering,
-    nullsWhich :: Maybe NullsWhich
+    nullsWhich :: NullsWhich
   }
   deriving stock (Eq, Generic, Show)
