@@ -1,4 +1,9 @@
-module Sqlite.Syntax.Internal.Type.OrderingTerm where
+module Sqlite.Syntax.Internal.Type.OrderingTerm
+  ( NullsWhich (..),
+    Ordering (..),
+    OrderingTerm (..),
+  )
+where
 
 import Data.Text (Text)
 import GHC.Generics (Generic)

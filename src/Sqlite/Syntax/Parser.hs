@@ -144,7 +144,6 @@ syntaxParser :: forall r. Earley.Grammar r (Syntax r)
 syntaxParser = mdo
   commonTableExpressionsRule <- Earley.rule (makeCommonTableExpressionsRule selectStatementRule)
   expressionRule <- makeExpressionRule selectStatementRule windowParser
-  indexedColumnRule <- Earley.rule (makeIndexedColumn expressionRule)
   orderingTermParser <- Earley.rule (makeOrderingTermRule expressionRule)
   selectStatementRule <-
     makeSelectStatementParser
@@ -162,14 +161,13 @@ syntaxParser = mdo
 
       createIndexStatement :: Rule r CreateIndexStatement
       createIndexStatement =
-        makeCreateIndexStatement expressionRule indexedColumnRule
+        makeCreateIndexStatement expressionRule
 
       createTableStatement :: Rule r CreateTableStatement
       createTableStatement =
         makeCreateTableStatement
           columnDefinitionRule
           expressionRule
-          indexedColumnRule
           selectStatementRule
 
       statementParser :: Rule r Statement
@@ -445,14 +443,14 @@ data CreateIndexStatement = CreateIndexStatement
   }
   deriving stock (Eq, Generic, Show)
 
-makeCreateIndexStatement :: Rule r Expression -> Rule r IndexedColumn -> Rule r CreateIndexStatement
-makeCreateIndexStatement expression indexedColumn =
+makeCreateIndexStatement :: Rule r Expression -> Rule r CreateIndexStatement
+makeCreateIndexStatement expression =
   CreateIndexStatement
     <$> (Token.create *> perhaps Token.unique)
     <*> (Token.index *> perhaps (Token.if_ *> Token.not *> Token.exists))
     <*> namespacedRule Token.identifier Token.identifier
     <*> (Token.on *> Token.identifier)
-    <*> parens (commaSep1 indexedColumn)
+    <*> parens (commaSep1 indexedColumnRule)
     <*> optional (Token.where_ *> expression)
 
 -- | https://sqlite.org/syntax/create-table-stmt.html
@@ -468,10 +466,9 @@ makeCreateTableStatement ::
   forall r.
   Rule r ColumnDefinition ->
   Rule r Expression ->
-  Rule r IndexedColumn ->
   Rule r SelectStatement ->
   Rule r CreateTableStatement
-makeCreateTableStatement columnDefinition expression indexedColumn selectStatement =
+makeCreateTableStatement columnDefinition expression selectStatement =
   CreateTableStatement
     <$> (Token.create *> perhaps (choice [Token.temp, Token.temporary]))
     <*> (Token.table *> perhaps (Token.if_ *> Token.not *> Token.exists))
@@ -503,10 +500,10 @@ makeCreateTableStatement columnDefinition expression indexedColumn selectStateme
                     <$> (Token.foreign_ *> Token.key *> parens (commaSep1 Token.identifier))
                     <*> foreignKeyClauseRule,
                   TableConstraint'PrimaryKey
-                    <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumn))
+                    <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumnRule))
                     <*> optional onConflictParser,
                   TableConstraint'Unique
-                    <$> (Token.unique *> parens (commaSep1 indexedColumn))
+                    <$> (Token.unique *> parens (commaSep1 indexedColumnRule))
                     <*> optional onConflictParser
                 ]
 
@@ -734,20 +731,26 @@ generatedType =
     ]
 
 -- | https://sqlite.org/syntax/indexed-column.html
+--
+-- From https://sqlite.org/lang_createtable.html:
+--
+--   * The PRIMARY KEY clause must contain only column names — the use of expressions in an indexed-column of a PRIMARY
+--     KEY is not supported.
+--
+--   * As with PRIMARY KEYs, a UNIQUE table-constraint clause must contain only column names — the use of expressions in
+--     an indexed-column of a UNIQUE table-constraint is not supported.
 data IndexedColumn = IndexedColumn
-  { column :: Either Text Expression,
+  { column :: Text,
     collation :: Maybe Text,
     ordering :: Ordering
   }
   deriving stock (Eq, Generic, Show)
 
-makeIndexedColumn :: Rule r Expression -> Rule r IndexedColumn
-makeIndexedColumn expression =
+-- | https://sqlite.org/syntax/indexed-column.html
+indexedColumnRule :: Rule r IndexedColumn
+indexedColumnRule =
   IndexedColumn
-    <$> choice
-      [ Left <$> Token.identifier,
-        Right <$> expression
-      ]
+    <$> Token.identifier
     <*> optional (Token.collate *> Token.identifier)
     <*> orderingRule
 
