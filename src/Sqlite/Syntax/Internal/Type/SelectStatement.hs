@@ -115,6 +115,7 @@ data Table
   | Table'Subquery (Aliased Maybe SelectStatement)
   deriving stock (Eq, Generic, Show)
 
+-- TODO rename to CommonTableExpressions, move
 data WithClause = WithClause
   { -- | @RECURSIVE@
     recursive :: Bool,
