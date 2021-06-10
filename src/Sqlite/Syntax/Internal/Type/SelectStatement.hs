@@ -138,7 +138,7 @@ data SelectCore
 --   [__limit__]
 -- @
 data SelectStatement = SelectStatement
-  { with :: Maybe CommonTableExpressions,
+  { commonTableExpressions :: Maybe CommonTableExpressions,
     select :: CompoundSelect,
     orderBy :: Maybe (NonEmpty OrderingTerm),
     limit :: Maybe Limit

@@ -41,6 +41,7 @@ module Sqlite.Syntax
     Select (..),
     SelectCore (..),
     SelectStatement (..),
+    Statement (..),
     Table (..),
     Window (..),
   )
@@ -59,3 +60,5 @@ import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Window
+-- TODO remove
+import Sqlite.Syntax.Parser

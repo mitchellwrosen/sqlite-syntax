@@ -4,10 +4,11 @@ import qualified Data.ByteString as ByteString
 import Data.Foldable
 import Data.Function
 import Data.Text (Text)
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text.IO as Text
+import Prettyprinter (pretty)
 import qualified Sqlite.Syntax.Parser as Parser
+import Sqlite.Syntax.Pretty ()
 import System.Directory
 import Text.Pretty.Simple (pPrint)
 import Prelude hiding (readFile)
@@ -30,7 +31,9 @@ parseGoldenFiles = do
             Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
             Parser.AmbiguousParse x -> pPrint x
         Right statement -> do
-          Text.putStrLn (Text.pack (show statement))
+          print (pretty statement)
+          putStrLn ""
+          pPrint statement
           _ <- getLine
           loop files
 

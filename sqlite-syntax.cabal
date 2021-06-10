@@ -12,6 +12,7 @@ common component
     Earley,
     megaparsec,
     parser-combinators,
+    prettyprinter,
     text,
     unordered-containers,
   default-extensions:
@@ -53,6 +54,7 @@ library
     Sqlite.Syntax
     Sqlite.Syntax.Lexer
     Sqlite.Syntax.Parser
+    Sqlite.Syntax.Pretty
     Sqlite.Syntax.Token
   hs-source-dirs: src
   other-modules:
