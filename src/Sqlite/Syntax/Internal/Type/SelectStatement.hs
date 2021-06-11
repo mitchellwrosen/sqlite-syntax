@@ -10,35 +10,11 @@ import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.Namespaced
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
+import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.CommonTableExpressions (CommonTableExpressions)
 import Sqlite.Syntax.Internal.Type.Window
-import Prelude hiding (Ordering, fail, not, null)
+import Prelude
 
--- | https://sqlite.org/syntax/common-table-expression.html
---
--- @
--- __table__ [(__column__+)] /AS/ [[/NOT/] /MATERIALIZED/] (__select-statement__)
--- @
-data CommonTableExpression = CommonTableExpression
-  { table :: Text,
-    columns :: Maybe (NonEmpty Text),
-    materialized :: Maybe Bool,
-    select :: SelectStatement
-  }
-  deriving stock (Eq, Generic, Show)
-
--- |
--- @
--- /WITH/ [/RECURSIVE/] __common-table-expression__+
--- @
---
--- TODO move
-data CommonTableExpressions = CommonTableExpressions
-  { recursive :: Bool,
-    tables :: NonEmpty CommonTableExpression
-  }
-  deriving stock (Eq, Generic, Show)
-
--- |
+-- | https://sqlite.org/lang_select.html
 --
 -- @
 -- __select-core__
@@ -58,7 +34,8 @@ data CompoundSelect
   | UnionAll CompoundSelect SelectCore
   deriving stock (Eq, Generic, Show)
 
--- |
+-- | https://sqlite.org/lang_select.html
+--
 -- @
 -- /GROUP BY/ __expression__+ [/HAVING/ expression]
 -- @
@@ -79,7 +56,8 @@ data JoinConstraint
   | Using (NonEmpty Text)
   deriving stock (Eq, Generic, Show)
 
--- |
+-- | https://sqlite.org/lang_select.html
+--
 -- @
 -- /LIMIT/ __expression__ [/OFFSET/ __expression__]
 -- @
@@ -89,7 +67,9 @@ data Limit = Limit
   }
   deriving stock (Eq, Generic, Show)
 
--- | https://sqlite.org/syntax/result-column.html
+-- |
+-- * https://sqlite.org/lang_select.html
+-- * https://sqlite.org/syntax/result-column.html
 --
 -- @
 -- __expression__ [/AS/] __column__
@@ -100,7 +80,8 @@ data ResultColumn
   | ResultColumn'Wildcard (Namespaced Text ())
   deriving stock (Eq, Generic, Show)
 
--- |
+-- | https://sqlite.org/lang_select.html
+--
 -- @
 -- /SELECT/ [/DISTINCT/] __result-column__+
 --   [/FROM/ __table_]
@@ -118,7 +99,9 @@ data Select = Select
   }
   deriving stock (Eq, Generic, Show)
 
--- | https://sqlite.org/syntax/select-core.html
+-- |
+-- * https://sqlite.org/lang_select.html
+-- * https://sqlite.org/syntax/select-core.html
 --
 -- @
 -- /SELECT/ __select__
@@ -129,7 +112,7 @@ data SelectCore
   | SelectCore'Values (NonEmpty (NonEmpty Expression))
   deriving stock (Eq, Generic, Show)
 
--- | https://sqlite.org/syntax/select-stmt.html
+-- | https://sqlite.org/lang_select.html
 --
 -- @
 -- [__common-table-expressions__]

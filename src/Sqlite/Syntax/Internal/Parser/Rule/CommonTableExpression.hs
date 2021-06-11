@@ -7,7 +7,8 @@ where
 import Control.Applicative hiding (some)
 import Control.Applicative.Combinators (choice)
 import Sqlite.Syntax.Internal.Parser.Utils
-import Sqlite.Syntax.Internal.Type.SelectStatement
+import Sqlite.Syntax.Internal.Type.CommonTableExpressions (CommonTableExpression (..), CommonTableExpressions (..))
+import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Prelude hiding (Ordering, fail, lex, not, null)
 

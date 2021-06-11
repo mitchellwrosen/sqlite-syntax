@@ -25,6 +25,7 @@ import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.Aliased
+import Sqlite.Syntax.Internal.Type.CommonTableExpressions
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.IndexedColumn

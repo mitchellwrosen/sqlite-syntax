@@ -68,6 +68,8 @@ library
     Sqlite.Syntax.Internal.Parser.Rule.Table
     Sqlite.Syntax.Internal.Parser.Utils
     Sqlite.Syntax.Internal.Type.Aliased
+    Sqlite.Syntax.Internal.Type.CommonTableExpressions
+    Sqlite.Syntax.Internal.Type.DeleteStatement
     Sqlite.Syntax.Internal.Type.Expression
     Sqlite.Syntax.Internal.Type.ForeignKeyClause
     Sqlite.Syntax.Internal.Type.FunctionCall
@@ -78,6 +80,7 @@ library
     Sqlite.Syntax.Internal.Type.Ordering
     Sqlite.Syntax.Internal.Type.OrderingTerm
     Sqlite.Syntax.Internal.Type.QualifiedTableName
+    Sqlite.Syntax.Internal.Type.Returning
     Sqlite.Syntax.Internal.Type.SelectStatement
     Sqlite.Syntax.Internal.Type.Window
     Sqlite.Syntax.Parser.Token

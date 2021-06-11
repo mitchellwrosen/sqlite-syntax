@@ -8,6 +8,7 @@ module Sqlite.Syntax
     CommonTableExpression (..),
     CommonTableExpressions (..),
     CompoundSelect (..),
+    DeleteStatement (..),
     Expression (..),
     ForeignKeyClause (..),
     Frame (..),
@@ -37,6 +38,7 @@ module Sqlite.Syntax
     Raise (..),
     Reference (..),
     ResultColumn (..),
+    Returning (..),
     RowValue (..),
     Select (..),
     SelectCore (..),
@@ -48,6 +50,8 @@ module Sqlite.Syntax
 where
 
 import Sqlite.Syntax.Internal.Type.Aliased
+import Sqlite.Syntax.Internal.Type.CommonTableExpressions
+import Sqlite.Syntax.Internal.Type.DeleteStatement
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
@@ -58,6 +62,7 @@ import Sqlite.Syntax.Internal.Type.Namespaced
 import Sqlite.Syntax.Internal.Type.Ordering
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
+import Sqlite.Syntax.Internal.Type.Returning
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Window
 -- TODO remove
