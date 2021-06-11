@@ -11,6 +11,8 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (catMaybes)
 import Prettyprinter
 import Sqlite.Syntax
+-- TODO remove
+import Sqlite.Syntax.Parser
 import Prelude hiding (Ordering)
 
 commaSep :: [Doc a] -> [Doc a]
@@ -19,7 +21,25 @@ commaSep =
 
 commaSepIndented :: [Doc a] -> Doc a
 commaSepIndented =
-  nest 2 . foldMap (line <>) . commaSep
+  nest 2 . foldMap (softline <>) . commaSep
+
+hardlines :: [Doc a] -> Doc a
+hardlines =
+  concatWith
+    (\x y -> x <> hardline <> y)
+
+parenthesized :: Doc a -> Doc a
+parenthesized x =
+  lparen <> nest 2 (softline' <> x) <> softline' <> rparen
+
+--
+
+prettyMaybeAliased :: Pretty a => Aliased Maybe a -> Doc b
+prettyMaybeAliased = \case
+  Aliased x Nothing -> pretty x
+  Aliased x (Just y) -> hsep [pretty x, "AS", pretty y]
+
+--
 
 instance Pretty CompoundSelect where
   pretty = \case
@@ -30,8 +50,9 @@ instance Pretty CompoundSelect where
     UnionAll x y -> compound "UNION ALL" x y
     where
       compound s x y =
-        sep [pretty x, s, pretty y]
+        hardlines [pretty x, s, pretty y]
 
+-- TODO fewer parens
 instance Pretty Expression where
   pretty = \case
     Expression'AggregateDistinctFunctionCall {} -> undefined
@@ -46,7 +67,7 @@ instance Pretty Expression where
     Expression'Column x -> pretty x
     Expression'Concatenate {} -> undefined
     Expression'Divide {} -> undefined
-    Expression'Equals {} -> undefined
+    Expression'Equals x y -> binop "=" x y
     Expression'Exists {} -> undefined
     Expression'FunctionCall {} -> undefined
     Expression'Glob {} -> undefined
@@ -57,10 +78,10 @@ instance Pretty Expression where
     Expression'InTable {} -> undefined
     Expression'InValues {} -> undefined
     Expression'Is {} -> undefined
-    Expression'LessThan {} -> undefined
+    Expression'LessThan x y -> binop "<" x y
     Expression'LessThanOrEquals {} -> undefined
     Expression'Like {} -> undefined
-    Expression'LiteralValue {} -> undefined
+    Expression'LiteralValue x -> pretty x
     Expression'Match {} -> undefined
     Expression'Minus {} -> undefined
     Expression'Modulo {} -> undefined
@@ -77,6 +98,9 @@ instance Pretty Expression where
     Expression'ShiftLeft {} -> undefined
     Expression'ShiftRight {} -> undefined
     Expression'Subquery {} -> undefined
+    where
+      binop s x y =
+        parenthesized (hsep [pretty x, s, pretty y])
 
 instance Pretty GroupBy where
   pretty GroupBy {groupBy, having} =
@@ -85,8 +109,25 @@ instance Pretty GroupBy where
         <> commaSepIndented (map pretty (toList groupBy))
         <> maybe mempty (\e -> line <> "HAVING" <+> pretty e) having
 
+instance Pretty JoinConstraint where
+  pretty = \case
+    On x -> "ON" <+> pretty x
+    Using _ -> undefined
+
 instance Pretty Limit where
   pretty = undefined
+
+instance Pretty LiteralValue where
+  pretty = \case
+    Blob _ -> undefined
+    Boolean True -> "TRUE"
+    Boolean False -> "FALSE"
+    CurrentDate -> "CURRENT_DATE"
+    CurrentTime -> "CURRENT_TIME"
+    CurrentTimestamp -> "CURRENT_TIMESTAMP"
+    Null -> "NULL"
+    Number x -> pretty x
+    String _ -> undefined
 
 instance Pretty Ordering where
   pretty = \case
@@ -94,11 +135,20 @@ instance Pretty Ordering where
     Descending -> "DESC"
 
 instance Pretty OrderingTerm where
-  pretty = undefined
+  pretty OrderingTerm {expression, collation, ordering, nullsPlacement} =
+    case collation of
+      Nothing -> hsep [pretty expression, pretty ordering, pretty nullsPlacement]
+      Just _ -> undefined
 
 instance (Pretty a, Pretty b) => Pretty (Namespaced a b) where
   pretty (Namespaced x y) =
     maybe mempty ((<> dot) . pretty) x <> pretty y
+
+instance Pretty QualifiedTableName where
+  pretty QualifiedTableName {name, indexedBy} =
+    case indexedBy of
+      Nothing -> prettyMaybeAliased name
+      Just _ -> undefined
 
 instance Pretty NullsPlacement where
   pretty = \case
@@ -107,13 +157,16 @@ instance Pretty NullsPlacement where
 
 instance Pretty ResultColumn where
   pretty = \case
-    ResultColumn'Expression (Aliased x y) -> pretty x <> maybe mempty ((space <>) . ("AS" <+>) . pretty) y
+    ResultColumn'Expression x -> prettyMaybeAliased x
     ResultColumn'Wildcard (Namespaced mx ()) -> maybe "*" (\x -> pretty x <> dot <> "*") mx
 
 instance Pretty Select where
   pretty Select {distinct, columns, from, where_, groupBy, window} =
-    sep
-      ( ("SELECT" <+> (if distinct then "DISTINCT" else "ALL") <> commaSepIndented (map pretty (toList columns))) :
+    hardlines
+      ( ( "SELECT"
+            <> (if distinct then space <> "DISTINCT" else mempty)
+            <> commaSepIndented (map pretty (toList columns))
+        ) :
         catMaybes
           [ (("FROM" <+>) . pretty) <$> from,
             (("WHERE" <+>) . pretty) <$> where_,
@@ -152,7 +205,7 @@ instance Pretty Statement where
     Statement'AlterTable {} -> undefined
     Statement'Analyze {} -> undefined
     Statement'Attach {} -> undefined
-    Statement'Begin {} -> undefined
+    Statement'Begin x -> hsep ["BEGIN", pretty x, "TRANSACTION"]
     Statement'Commit {} -> undefined
     Statement'CreateIndex {} -> undefined
     Statement'CreateTable {} -> undefined
@@ -176,15 +229,44 @@ instance Pretty Statement where
 
 instance Pretty Table where
   pretty = \case
-    Table {} -> undefined
+    Table x -> pretty x
     Table'CrossJoin {} -> undefined
     Table'Function {} -> undefined
-    Table'InnerJoin {} -> undefined
+    Table'InnerJoin x y z ->
+      group do
+        pretty x
+          <> line
+          <> "INNER JOIN"
+          <> line
+          <> pretty0 y
+          <> maybe mempty ((line <>) . pretty) z
     Table'LeftOuterJoin {} -> undefined
     Table'NaturalCrossJoin {} -> undefined
     Table'NaturalInnerJoin {} -> undefined
     Table'NaturalLeftOuterJoin {} -> undefined
-    Table'Subquery {} -> undefined
+    Table'Subquery (Aliased x Nothing) -> parenthesized (pretty x)
+    Table'Subquery (Aliased x (Just y)) -> hsep [parenthesized (pretty x), "AS", pretty y]
+    where
+      pretty0 table =
+        case table of
+          Table {} -> ptable
+          Table'CrossJoin {} -> parenthesized ptable
+          Table'Function {} -> undefined
+          Table'InnerJoin {} -> parenthesized ptable
+          Table'LeftOuterJoin {} -> parenthesized ptable
+          Table'NaturalCrossJoin {} -> parenthesized ptable
+          Table'NaturalInnerJoin {} -> parenthesized ptable
+          Table'NaturalLeftOuterJoin {} -> parenthesized ptable
+          Table'Subquery {} -> undefined
+        where
+          ptable =
+            pretty table
+
+instance Pretty TransactionType where
+  pretty = \case
+    TransactionType'Deferred -> "DEFERRED"
+    TransactionType'Exclusive -> "EXCLUSIVE"
+    TransactionType'Immediate -> "IMMEDIATE"
 
 instance Pretty Window where
   pretty = undefined
