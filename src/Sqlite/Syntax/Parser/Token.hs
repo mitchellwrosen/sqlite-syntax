@@ -1,3 +1,4 @@
+-- TODO delete the names of parsers? these are (usually?) too numerous and low-level
 module Sqlite.Syntax.Parser.Token where
 
 import Data.Text (Text)
@@ -870,6 +871,13 @@ restrict =
   (<?> "RESTRICT") do
     Earley.terminal \case
       LocatedToken RESTRICT _ -> Just ()
+      _ -> Nothing
+
+returning :: Terminal r ()
+returning =
+  (<?> "RETURNING") do
+    Earley.terminal \case
+      LocatedToken RETURNING _ -> Just ()
       _ -> Nothing
 
 rightParenthesis :: Terminal r ()

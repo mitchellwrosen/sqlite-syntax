@@ -16,16 +16,19 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
+import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
 import Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn (indexedColumnRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
+import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.CommonTableExpressions
+import Sqlite.Syntax.Internal.Type.DeleteStatement
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.IndexedColumn
@@ -34,6 +37,7 @@ import Sqlite.Syntax.Internal.Type.Named
 import Sqlite.Syntax.Internal.Type.Namespaced
 import Sqlite.Syntax.Internal.Type.Ordering
 import Sqlite.Syntax.Internal.Type.OrderingTerm
+import Sqlite.Syntax.Internal.Type.Returning
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Window
 import Sqlite.Syntax.Lexer (lex)
@@ -147,17 +151,17 @@ data Syntax r = Syntax
 syntaxParser :: forall r. Earley.Grammar r (Syntax r)
 syntaxParser = mdo
   commonTableExpressionsRule <- Earley.rule (makeCommonTableExpressionsRule selectStatementRule)
-  expressionRule <- makeExpressionRule selectStatementRule windowParser
-  orderingTermParser <- Earley.rule (makeOrderingTermRule expressionRule)
+  expressionRule <- makeExpressionRule selectStatementRule windowRule
+  orderingTermRule <- Earley.rule (makeOrderingTermRule expressionRule)
   selectStatementRule <-
     makeSelectStatementParser
       commonTableExpressionsRule
       expressionRule
-      orderingTermParser
+      orderingTermRule
       tableRule
-      windowParser
+      windowRule
   tableRule <- makeTableRule expressionRule selectStatementRule
-  windowParser <- Earley.rule (makeWindowParser expressionRule orderingTermParser)
+  windowRule <- Earley.rule (makeWindowParser expressionRule orderingTermRule)
 
   let columnDefinitionRule :: Rule r ColumnDefinition
       columnDefinitionRule =
@@ -169,10 +173,15 @@ syntaxParser = mdo
 
       createTableStatement :: Rule r CreateTableStatement
       createTableStatement =
-        makeCreateTableStatement
-          columnDefinitionRule
-          expressionRule
-          selectStatementRule
+        makeCreateTableStatement columnDefinitionRule expressionRule selectStatementRule
+
+      deleteStatementRule :: Rule r DeleteStatement
+      deleteStatementRule =
+        makeDeleteStatementRule commonTableExpressionsRule expressionRule returningRule
+
+      returningRule :: Rule r Returning
+      returningRule =
+        makeReturningRule expressionRule
 
       statementParser :: Rule r Statement
       statementParser =
@@ -196,7 +205,7 @@ syntaxParser = mdo
             Statement'CreateTrigger <$> pure TODO,
             Statement'CreateView <$> pure TODO,
             Statement'CreateVirtualTable <$> pure TODO,
-            Statement'Delete <$> pure TODO,
+            Statement'Delete <$> deleteStatementRule,
             Statement'Detach <$> pure TODO,
             Statement'DropIndex <$> pure TODO,
             Statement'DropTable <$> pure TODO,
@@ -225,12 +234,12 @@ syntaxParser = mdo
       }
   where
     makeWindowParser :: Rule r Expression -> Rule r OrderingTerm -> Rule r Window
-    makeWindowParser expressionRule orderingTermParser =
+    makeWindowParser expressionRule orderingTermRule =
       parens do
         Window
           <$> optional Token.identifier
           <*> optional (Token.partition *> Token.by *> commaSep1 expressionRule)
-          <*> optional (Token.order *> Token.by *> commaSep1 orderingTermParser)
+          <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
           <*> choice [frameParser, pure defaultFrame]
       where
         defaultFrame :: Frame
@@ -309,16 +318,23 @@ data Statement
   = Statement'AlterTable AlterTableStatement
   | Statement'Analyze AnalyzeStatement
   | Statement'Attach AttachStatement
-  | -- | https://sqlite.org/syntax/begin-stmt.html
+  | -- |
+    -- * https://sqlite.org/lang_transaction.html
+    -- * https://sqlite.org/syntax/begin-stmt.html
     Statement'Begin TransactionType
-  | -- | https://sqlite.org/syntax/commit-stmt.html
+  | -- |
+    -- * https://sqlite.org/lang_transaction.html
+    -- * https://sqlite.org/syntax/commit-stmt.html
     Statement'Commit
   | Statement'CreateIndex CreateIndexStatement
   | Statement'CreateTable CreateTableStatement
   | Statement'CreateTrigger TODO
   | Statement'CreateView TODO
   | Statement'CreateVirtualTable TODO
-  | Statement'Delete TODO
+  | -- |
+    -- * https://sqlite.org/syntax/delete-stmt.html
+    -- * https://sqlite.org/lang_delete.html
+    Statement'Delete DeleteStatement
   | Statement'Detach TODO
   | Statement'DropIndex TODO
   | Statement'DropTable TODO
@@ -518,7 +534,7 @@ data Default
   deriving stock (Eq, Generic, Show)
 
 makeExpressionRule :: Rule r SelectStatement -> Rule r Window -> Earley.Grammar r (Rule r Expression)
-makeExpressionRule selectStatement windowParser = mdo
+makeExpressionRule selectStatement windowRule = mdo
   filterClauseParser <- Earley.rule (Token.filter *> parens (Token.where_ *> expression))
 
   expression <-
@@ -567,7 +583,7 @@ makeExpressionRule selectStatement windowParser = mdo
                     <*> optional
                       ( Token.over
                           *> choice
-                            [ Over'Window <$> windowParser,
+                            [ Over'Window <$> windowRule,
                               Over'WindowName <$> Token.identifier
                             ]
                       )
@@ -806,14 +822,14 @@ makeSelectStatementParser ::
   Rule r Table ->
   Rule r Window ->
   Earley.Grammar r (Rule r SelectStatement)
-makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTermParser tableRule windowParser = mdo
-  compoundSelectParser <- makeCompoundSelectParser tableRule
+makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTermRule tableRule windowRule = mdo
+  compoundSelectParser <- makeCompoundSelectRule tableRule
   selectStatementRule <-
     Earley.rule do
       SelectStatement
         <$> optional commonTableExpressionsRule
         <*> compoundSelectParser
-        <*> optional (Token.order *> Token.by *> commaSep1 orderingTermParser)
+        <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
         <*> optional limitRule
   pure selectStatementRule
   where
@@ -837,8 +853,8 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
           -- LIMIT y, x
           Just (Right e2) -> Limit e2 (Just e1)
 
-    makeCompoundSelectParser :: Rule r Table -> Earley.Grammar r (Rule r CompoundSelect)
-    makeCompoundSelectParser tableParser = mdo
+    makeCompoundSelectRule :: Rule r Table -> Earley.Grammar r (Rule r CompoundSelect)
+    makeCompoundSelectRule tableParser = mdo
       compoundSelectParser <-
         Earley.rule do
           choice
@@ -882,7 +898,8 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
         resultColumnRule :: Rule r ResultColumn
         resultColumnRule =
           choice
-            [ ResultColumn'Expression <$> (Aliased <$> expressionRule <*> optional (Token.as *> Token.identifier)),
+            [ ResultColumn'Expression
+                <$> (Aliased <$> expressionRule <*> optional (perhaps_ Token.as *> Token.identifier)),
               ResultColumn'Wildcard <$> namespacedRule Token.identifier (() <$ Token.asterisk)
             ]
         windowClauseParser :: Rule r (NonEmpty (Aliased Identity Window))
@@ -891,7 +908,7 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
             *> commaSep1
               ( (\x y -> Aliased y (Identity x))
                   <$> Token.identifier
-                  <*> (Token.as *> windowParser)
+                  <*> (Token.as *> windowRule)
               )
 
 data Sign
