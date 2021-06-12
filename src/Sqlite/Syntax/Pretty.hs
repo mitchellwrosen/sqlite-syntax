@@ -41,6 +41,9 @@ prettyMaybeAliased = \case
 
 --
 
+instance Pretty CommonTableExpressions where
+  pretty = undefined
+
 instance Pretty CompoundSelect where
   pretty = \case
     CompoundSelect x -> pretty x
@@ -51,6 +54,13 @@ instance Pretty CompoundSelect where
     where
       compound s x y =
         hardlines [pretty x, s, pretty y]
+
+instance Pretty DeleteStatement where
+  pretty DeleteStatement {commonTableExpressions, table, where_, returning} =
+    maybe mempty ((<> hardline) . pretty) commonTableExpressions
+      <> "DELETE FROM" <+> pretty table
+      <> maybe mempty ((hardline <>) . ("WHERE" <+>) . pretty) where_
+      <> maybe mempty ((hardline <>) . pretty) returning
 
 -- TODO fewer parens
 instance Pretty Expression where
@@ -160,6 +170,9 @@ instance Pretty ResultColumn where
     ResultColumn'Expression x -> prettyMaybeAliased x
     ResultColumn'Wildcard (Namespaced mx ()) -> maybe "*" (\x -> pretty x <> dot <> "*") mx
 
+instance Pretty Returning where
+  pretty = undefined
+
 instance Pretty Select where
   pretty Select {distinct, columns, from, where_, groupBy, window} =
     hardlines
@@ -212,7 +225,7 @@ instance Pretty Statement where
     Statement'CreateTrigger {} -> undefined
     Statement'CreateView {} -> undefined
     Statement'CreateVirtualTable {} -> undefined
-    Statement'Delete {} -> undefined
+    Statement'Delete x -> pretty x
     Statement'Detach {} -> undefined
     Statement'DropIndex {} -> undefined
     Statement'DropTable {} -> undefined
