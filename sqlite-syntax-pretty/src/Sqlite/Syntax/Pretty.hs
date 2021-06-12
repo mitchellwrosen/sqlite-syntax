@@ -11,8 +11,6 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (catMaybes)
 import Prettyprinter
 import Sqlite.Syntax
--- TODO remove
-import Sqlite.Syntax.Parser
 import Prelude hiding (Ordering)
 
 commaSep :: [Doc a] -> [Doc a]
@@ -277,9 +275,9 @@ instance Pretty Table where
 
 instance Pretty TransactionType where
   pretty = \case
-    TransactionType'Deferred -> "DEFERRED"
-    TransactionType'Exclusive -> "EXCLUSIVE"
-    TransactionType'Immediate -> "IMMEDIATE"
+    Deferred -> "DEFERRED"
+    Exclusive -> "EXCLUSIVE"
+    Immediate -> "IMMEDIATE"
 
 instance Pretty Window where
   pretty = undefined

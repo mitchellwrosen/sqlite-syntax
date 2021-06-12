@@ -15,6 +15,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
+import Sqlite.Syntax
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
 import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
@@ -26,20 +27,6 @@ import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
 import Sqlite.Syntax.Internal.Parser.Utils
-import Sqlite.Syntax.Internal.Type.Aliased
-import Sqlite.Syntax.Internal.Type.CommonTableExpressions
-import Sqlite.Syntax.Internal.Type.DeleteStatement
-import Sqlite.Syntax.Internal.Type.Expression
-import Sqlite.Syntax.Internal.Type.ForeignKeyClause
-import Sqlite.Syntax.Internal.Type.IndexedColumn
-import Sqlite.Syntax.Internal.Type.LiteralValue
-import Sqlite.Syntax.Internal.Type.Named
-import Sqlite.Syntax.Internal.Type.Namespaced
-import Sqlite.Syntax.Internal.Type.Ordering
-import Sqlite.Syntax.Internal.Type.OrderingTerm
-import Sqlite.Syntax.Internal.Type.Returning
-import Sqlite.Syntax.Internal.Type.SelectStatement
-import Sqlite.Syntax.Internal.Type.Window
 import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Sqlite.Syntax.Token (LocatedToken (..))
@@ -192,38 +179,37 @@ syntaxParser = mdo
             Statement'Begin
               <$> ( Token.begin
                       *> choice
-                        [ TransactionType'Deferred <$ Token.deferred,
-                          TransactionType'Exclusive <$ Token.exclusive,
-                          TransactionType'Immediate <$ Token.immediate,
-                          pure TransactionType'Deferred
+                        [ Exclusive <$ Token.exclusive,
+                          Immediate <$ Token.immediate,
+                          Deferred <$ perhaps_ Token.deferred
                         ]
                       <* optional Token.transaction
                   ),
             Statement'Commit <$ (choice [Token.commit, Token.end] *> optional Token.transaction),
             Statement'CreateIndex <$> createIndexStatement,
             Statement'CreateTable <$> createTableStatement,
-            Statement'CreateTrigger <$> pure TODO,
-            Statement'CreateView <$> pure TODO,
-            Statement'CreateVirtualTable <$> pure TODO,
+            -- Statement'CreateTrigger <$> pure TODO,
+            -- Statement'CreateView <$> pure TODO,
+            -- Statement'CreateVirtualTable <$> pure TODO,
             Statement'Delete <$> deleteStatementRule,
-            Statement'Detach <$> pure TODO,
-            Statement'DropIndex <$> pure TODO,
-            Statement'DropTable <$> pure TODO,
-            Statement'DropTrigger <$> pure TODO,
-            Statement'DropView <$> pure TODO,
-            Statement'Insert <$> pure TODO,
-            Statement'Pragma <$> pure TODO,
-            Statement'Reindex <$> pure TODO,
-            Statement'Release <$> pure TODO,
+            -- Statement'Detach <$> pure TODO,
+            -- Statement'DropIndex <$> pure TODO,
+            -- Statement'DropTable <$> pure TODO,
+            -- Statement'DropTrigger <$> pure TODO,
+            -- Statement'DropView <$> pure TODO,
+            -- Statement'Insert <$> pure TODO,
+            -- Statement'Pragma <$> pure TODO,
+            -- Statement'Reindex <$> pure TODO,
+            -- Statement'Release <$> pure TODO,
             Statement'Rollback
               <$> ( Token.rollback
                       *> optional Token.transaction
                       *> optional (Token.to *> optional Token.savepoint *> Token.identifier)
                   ),
-            Statement'Savepoint <$> pure TODO,
-            Statement'Select <$> selectStatementRule,
-            Statement'Update <$> pure TODO,
-            Statement'Vacuum <$> pure TODO
+            -- Statement'Savepoint <$> pure TODO,
+            Statement'Select <$> selectStatementRule
+            -- Statement'Update <$> pure TODO,
+            -- Statement'Vacuum <$> pure TODO
           ]
           <* perhaps_ Token.semicolon
 
@@ -314,55 +300,7 @@ syntaxParser = mdo
                   pure ExcludeNoOthers
                 ]
 
-data Statement
-  = Statement'AlterTable AlterTableStatement
-  | Statement'Analyze AnalyzeStatement
-  | Statement'Attach AttachStatement
-  | -- |
-    -- * https://sqlite.org/lang_transaction.html
-    -- * https://sqlite.org/syntax/begin-stmt.html
-    Statement'Begin TransactionType
-  | -- |
-    -- * https://sqlite.org/lang_transaction.html
-    -- * https://sqlite.org/syntax/commit-stmt.html
-    Statement'Commit
-  | Statement'CreateIndex CreateIndexStatement
-  | Statement'CreateTable CreateTableStatement
-  | Statement'CreateTrigger TODO
-  | Statement'CreateView TODO
-  | Statement'CreateVirtualTable TODO
-  | -- |
-    -- * https://sqlite.org/syntax/delete-stmt.html
-    -- * https://sqlite.org/lang_delete.html
-    Statement'Delete DeleteStatement
-  | Statement'Detach TODO
-  | Statement'DropIndex TODO
-  | Statement'DropTable TODO
-  | Statement'DropTrigger TODO
-  | Statement'DropView TODO
-  | Statement'Insert TODO
-  | Statement'Pragma TODO
-  | Statement'Reindex TODO
-  | Statement'Release TODO
-  | -- | https://sqlite.org/syntax/rollback-stmt.html
-    Statement'Rollback (Maybe Text)
-  | Statement'Savepoint TODO
-  | Statement'Select SelectStatement
-  | Statement'Update TODO
-  | Statement'Vacuum TODO
-  deriving stock (Eq, Generic, Show)
-
-data TODO = TODO
-  deriving stock (Eq, Generic, Show)
-
 --
-
--- | https://sqlite.org/lang_altertable.html
-data AlterTableStatement = AlterTableStatement
-  { table :: Namespaced Text Text,
-    alteration :: TableAlteration
-  }
-  deriving stock (Eq, Generic, Show)
 
 makeAlterTableStatement :: Rule r ColumnDefinition -> Rule r AlterTableStatement
 makeAlterTableStatement columnDefinition =
@@ -377,44 +315,13 @@ makeAlterTableStatement columnDefinition =
           <*> (Token.to *> Token.identifier)
       ]
 
--- | https://sqlite.org/lang_analyze.html
-data AnalyzeStatement
-  = AnalyzeStatement (Maybe (Namespaced Text Text))
-  deriving stock (Eq, Generic, Show)
-
 analyzeStatement :: Rule r AnalyzeStatement
 analyzeStatement =
   AnalyzeStatement <$> (Token.analyze *> optional (namespacedRule Token.identifier Token.identifier))
 
--- | https://sqlite.org/syntax/attach-stmt.html
-data AttachStatement = AttachStatement
-  { database :: Expression,
-    schema :: Text
-  }
-  deriving stock (Eq, Generic, Show)
-
 makeAttachStatement :: Rule r Expression -> Rule r AttachStatement
 makeAttachStatement expression =
   AttachStatement <$> (Token.attach *> optional Token.database *> expression) <*> (Token.as *> Token.identifier)
-
-data ColumnConstraint
-  = ColumnConstraint'Check Expression
-  | ColumnConstraint'Collate Text
-  | ColumnConstraint'Default Default
-  | ColumnConstraint'ForeignKey ForeignKeyClause
-  | ColumnConstraint'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraint'NotNull (Maybe OnConflict)
-  | ColumnConstraint'PrimaryKey Ordering (Maybe OnConflict) Bool
-  | ColumnConstraint'Unique (Maybe OnConflict)
-  deriving stock (Eq, Generic, Show)
-
--- | https://sqlite.org/syntax/column-def.html
-data ColumnDefinition = ColumnDefinition
-  { name :: Text,
-    type_ :: Maybe Text,
-    constraints :: [Named ColumnConstraint]
-  }
-  deriving stock (Eq, Generic, Show)
 
 makeColumnDefinitionRule :: forall r. Rule r Expression -> Rule r ColumnDefinition
 makeColumnDefinitionRule expressionRule =
@@ -452,17 +359,6 @@ makeColumnDefinitionRule expressionRule =
               ColumnConstraint'Unique <$> (Token.unique *> optional onConflictParser)
             ]
 
--- | https://sqlite.org/syntax/create-index-stmt.html
-data CreateIndexStatement = CreateIndexStatement
-  { unique :: Bool,
-    ifNotExists :: Bool,
-    name :: Namespaced Text Text,
-    table :: Text,
-    columns :: NonEmpty IndexedColumn,
-    where_ :: Maybe Expression
-  }
-  deriving stock (Eq, Generic, Show)
-
 makeCreateIndexStatement :: Rule r Expression -> Rule r CreateIndexStatement
 makeCreateIndexStatement expression =
   CreateIndexStatement
@@ -472,15 +368,6 @@ makeCreateIndexStatement expression =
     <*> (Token.on *> Token.identifier)
     <*> parens (commaSep1 indexedColumnRule)
     <*> optional (Token.where_ *> expression)
-
--- | https://sqlite.org/syntax/create-table-stmt.html
-data CreateTableStatement = CreateTableStatement
-  { temporary :: Bool,
-    ifNotExists :: Bool,
-    name :: Namespaced Text Text,
-    definition :: Either SelectStatement TableDefinition
-  }
-  deriving stock (Eq, Generic, Show)
 
 makeCreateTableStatement ::
   forall r.
@@ -526,12 +413,6 @@ makeCreateTableStatement columnDefinition expression selectStatement =
                     <$> (Token.unique *> parens (commaSep1 indexedColumnRule))
                     <*> optional onConflictParser
                 ]
-
-data Default
-  = Default'Expression Expression
-  | Default'LiteralValue LiteralValue
-  | Default'SignedNumber SignedNumber
-  deriving stock (Eq, Generic, Show)
 
 makeExpressionRule :: Rule r SelectStatement -> Rule r Window -> Earley.Grammar r (Rule r Expression)
 makeExpressionRule selectStatement windowRule = mdo
@@ -738,16 +619,11 @@ makeExpressionRule selectStatement windowRule = mdo
           Parameter'Ordinal <$> Token.parameter
         ]
 
-data GeneratedType
-  = GeneratedType'Stored
-  | GeneratedType'Virtual
-  deriving stock (Eq, Generic, Show)
-
 generatedType :: Rule r GeneratedType
 generatedType =
   choice
-    [ GeneratedType'Stored <$ Token.stored,
-      GeneratedType'Virtual <$ Token.virtual
+    [ Stored <$ Token.stored,
+      Virtual <$ Token.virtual
     ]
 
 literalValueRule :: Rule r LiteralValue
@@ -763,15 +639,6 @@ literalValueRule =
       Number <$> Token.number,
       String <$> Token.string
     ]
-
--- | https://sqlite.org/syntax/conflict-clause.html
-data OnConflict
-  = OnConflictAbort
-  | OnConflictFail
-  | OnConflictIgnore
-  | OnConflictReplace
-  | OnConflictRollback
-  deriving stock (Eq, Generic, Show)
 
 onConflictParser :: Rule r OnConflict
 onConflictParser =
@@ -911,52 +778,15 @@ makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTerm
                   <*> (Token.as *> windowRule)
               )
 
-data Sign
-  = Sign'HyphenMinus
-  | Sign'PlusSign
-  deriving stock (Eq, Generic, Show)
-
-sign :: Rule r Sign
-sign =
+signRule :: Rule r Sign
+signRule =
   choice
     [ Sign'HyphenMinus <$ Token.hyphenMinus,
       Sign'PlusSign <$ Token.plusSign
     ]
 
--- | https://sqlite.org/syntax/signed-number.html
-data SignedNumber
-  = SignedNumber (Maybe Sign) Text
-  deriving stock (Eq, Generic, Show)
-
 signedNumber :: Rule r SignedNumber
 signedNumber =
   SignedNumber
-    <$> optional sign
+    <$> optional signRule
     <*> Token.number
-
-data TableAlteration
-  = TableAlteration'AddColumn ColumnDefinition
-  | TableAlteration'DropColumn Text
-  | TableAlteration'Rename Text
-  | TableAlteration'RenameColumn Text Text
-  deriving stock (Eq, Generic, Show)
-
-data TableConstraint
-  = TableConstraint'Check Expression
-  | TableConstraint'ForeignKey (NonEmpty Text) ForeignKeyClause
-  | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflict)
-  | TableConstraint'Unique (NonEmpty IndexedColumn) (Maybe OnConflict)
-  deriving stock (Eq, Generic, Show)
-
-data TableDefinition = TableDefinition
-  { columns :: NonEmpty ColumnDefinition,
-    constraints :: [Named TableConstraint],
-    withoutRowid :: Bool
-  }
-  deriving stock (Eq, Generic, Show)
-
-data TransactionType
-  = TransactionType'Deferred
-  | TransactionType'Exclusive
-  | TransactionType'Immediate
-  deriving stock (Eq, Generic, Show)

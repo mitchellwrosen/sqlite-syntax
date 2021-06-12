@@ -2,12 +2,20 @@ module Sqlite.Syntax
   ( Action (..),
     AggregateDistinctFunctionCallExpression (..),
     Aliased (..),
+    AlterTableStatement (..),
+    AnalyzeStatement (..),
+    AttachStatement (..),
     CaseExpression (..),
     CastExpression (..),
     CollateExpression (..),
+    ColumnConstraint (..),
+    ColumnDefinition (..),
     CommonTableExpression (..),
     CommonTableExpressions (..),
     CompoundSelect (..),
+    CreateIndexStatement (..),
+    CreateTableStatement (..),
+    Default (..),
     DeleteStatement (..),
     Expression (..),
     ForeignKeyClause (..),
@@ -18,6 +26,7 @@ module Sqlite.Syntax
     FunctionArguments (..),
     FunctionCall (..),
     FunctionCallExpression (..),
+    GeneratedType (..),
     GroupBy (..),
     InFunctionExpression (..),
     InSubqueryExpression (..),
@@ -30,6 +39,7 @@ module Sqlite.Syntax
     Named (..),
     Namespaced (..),
     NullsPlacement (..),
+    OnConflict (..),
     Ordering (..),
     OrderingTerm (..),
     Over (..),
@@ -43,14 +53,26 @@ module Sqlite.Syntax
     Select (..),
     SelectCore (..),
     SelectStatement (..),
+    Sign (..),
+    SignedNumber (..),
     Statement (..),
     Table (..),
+    TableAlteration (..),
+    TableConstraint (..),
+    TableDefinition (..),
+    TransactionType (..),
     Window (..),
   )
 where
 
 import Sqlite.Syntax.Internal.Type.Aliased
+import Sqlite.Syntax.Internal.Type.AlterTableStatement
+import Sqlite.Syntax.Internal.Type.AnalyzeStatement
+import Sqlite.Syntax.Internal.Type.AttachStatement
+import Sqlite.Syntax.Internal.Type.ColumnDefinition
 import Sqlite.Syntax.Internal.Type.CommonTableExpressions
+import Sqlite.Syntax.Internal.Type.CreateIndexStatement
+import Sqlite.Syntax.Internal.Type.CreateTableStatement
 import Sqlite.Syntax.Internal.Type.DeleteStatement
 import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
@@ -59,11 +81,12 @@ import Sqlite.Syntax.Internal.Type.IndexedColumn
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
 import Sqlite.Syntax.Internal.Type.Namespaced
+import Sqlite.Syntax.Internal.Type.OnConflict
 import Sqlite.Syntax.Internal.Type.Ordering
 import Sqlite.Syntax.Internal.Type.OrderingTerm
 import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import Sqlite.Syntax.Internal.Type.Returning
 import Sqlite.Syntax.Internal.Type.SelectStatement
+import Sqlite.Syntax.Internal.Type.Statement
+import Sqlite.Syntax.Internal.Type.TransactionType
 import Sqlite.Syntax.Internal.Type.Window
--- TODO remove
-import Sqlite.Syntax.Parser
