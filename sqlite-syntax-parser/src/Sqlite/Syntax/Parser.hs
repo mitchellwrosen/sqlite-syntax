@@ -43,6 +43,7 @@ import Prelude hiding (Ordering, fail, lex, not, null)
 -- TODO rm *Clause
 -- TODO Parser -> Rule
 -- TODO quirks page says many keywords are valid identifiers..
+-- TODO combine Aliased/Named?
 
 --
 

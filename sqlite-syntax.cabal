@@ -78,6 +78,7 @@ library
     Sqlite.Syntax.Internal.Type.AnalyzeStatement
     Sqlite.Syntax.Internal.Type.AttachStatement
     Sqlite.Syntax.Internal.Type.ColumnDefinition
+    Sqlite.Syntax.Internal.Type.Columns
     Sqlite.Syntax.Internal.Type.CommonTableExpressions
     Sqlite.Syntax.Internal.Type.CreateIndexStatement
     Sqlite.Syntax.Internal.Type.CreateTableStatement
@@ -86,6 +87,7 @@ library
     Sqlite.Syntax.Internal.Type.ForeignKeyClause
     Sqlite.Syntax.Internal.Type.FunctionCall
     Sqlite.Syntax.Internal.Type.IndexedColumn
+    Sqlite.Syntax.Internal.Type.InsertStatement
     Sqlite.Syntax.Internal.Type.LiteralValue
     Sqlite.Syntax.Internal.Type.Named
     Sqlite.Syntax.Internal.Type.Namespaced
