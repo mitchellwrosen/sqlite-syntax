@@ -5,8 +5,7 @@ where
 
 import Control.Applicative hiding (some)
 import Control.Applicative.Combinators (choice)
-import qualified Data.List.NonEmpty as NonEmpty
-import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
+import Sqlite.Syntax.Internal.Parser.Rule.Columns (columnsRule)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import qualified Sqlite.Syntax.Parser.Token as Token
@@ -16,8 +15,8 @@ import Prelude
 
 foreignKeyClauseRule :: forall r. Rule r ForeignKeyClause
 foreignKeyClauseRule =
-  (\reference (onDelete, onUpdate) deferred -> ForeignKeyClause {reference, onDelete, onUpdate, deferred})
-    <$> (Token.references *> namespacedRule Token.identifier referenceRule)
+  (\references (onDelete, onUpdate) deferred -> ForeignKeyClause {references, onDelete, onUpdate, deferred})
+    <$> (Token.references *> columnsRule)
     <*> (fromActions <$> many actionClauseRule)
     <*> deferredRule
   where
@@ -55,12 +54,3 @@ deferredRule =
     f :: Bool -> Maybe Token -> Bool
     f False (Just Token.DEFERRED) = True
     f _ _ = False
-
-referenceRule :: Rule r Reference
-referenceRule =
-  Reference
-    <$> Token.identifier
-    <*> choice
-      [ parens (NonEmpty.toList <$> commaSep1 Token.identifier),
-        pure []
-      ]

@@ -5,6 +5,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
+import Sqlite.Syntax.Internal.Type.Columns (Columns)
 import Sqlite.Syntax.Internal.Type.FunctionCall (FunctionCall)
 import Sqlite.Syntax.Internal.Type.LiteralValue (LiteralValue)
 import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
@@ -98,7 +99,7 @@ data Expression
   | -- | /∙ COLLATE ∙/
     Expression'Collate CollateExpression
   | -- | /∙.∙.∙/
-    Expression'Column (Namespaced (Namespaced Text Text) Text)
+    Expression'Column (Columns Identity)
   | -- | /∙ || ∙/
     Expression'Concatenate Expression Expression
   | -- | /∙ / ∙/

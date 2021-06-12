@@ -61,6 +61,7 @@ library
     sqlite-syntax-parser/src
     sqlite-syntax-pretty/src
   other-modules:
+    Sqlite.Syntax.Internal.Parser.Rule.Columns
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement
     Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause

@@ -16,6 +16,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax
+import Sqlite.Syntax.Internal.Parser.Rule.Columns (columnRule)
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
 import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
@@ -451,7 +452,7 @@ makeExpressionRule selectStatement windowRule = mdo
                     <$> (Token.cast *> Token.leftParenthesis *> expression)
                     <*> (Token.as *> Token.identifier)
                 ),
-          Expression'Column <$> namespacedRule (namespacedRule Token.identifier Token.identifier) Token.identifier,
+          Expression'Column <$> columnRule,
           Expression'Exists <$> (Token.exists *> parens selectStatement),
           Expression'FunctionCall
             <$> ( FunctionCallExpression

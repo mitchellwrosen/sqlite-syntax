@@ -46,7 +46,6 @@ module Sqlite.Syntax
     Parameter (..),
     QualifiedTableName (..),
     Raise (..),
-    Reference (..),
     ResultColumn (..),
     Returning (..),
     RowValue (..),

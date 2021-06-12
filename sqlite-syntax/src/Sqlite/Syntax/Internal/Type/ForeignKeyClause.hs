@@ -1,13 +1,11 @@
 module Sqlite.Syntax.Internal.Type.ForeignKeyClause
   ( Action (..),
     ForeignKeyClause (..),
-    Reference (..),
   )
 where
 
-import Data.Text (Text)
 import GHC.Generics (Generic)
-import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
+import Sqlite.Syntax.Internal.Type.Columns (Columns)
 import Prelude
 
 -- | https://sqlite.org/syntax/foreign-key-clause.html
@@ -28,15 +26,9 @@ data Action
 --
 -- TODO rename?
 data ForeignKeyClause = ForeignKeyClause
-  { reference :: Namespaced Text Reference,
+  { references :: Columns [],
     onDelete :: Action,
     onUpdate :: Action,
     deferred :: Bool
-  }
-  deriving stock (Eq, Generic, Show)
-
-data Reference = Reference
-  { table :: Text,
-    columns :: [Text]
   }
   deriving stock (Eq, Generic, Show)
