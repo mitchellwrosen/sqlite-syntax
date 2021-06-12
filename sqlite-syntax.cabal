@@ -56,7 +56,10 @@ library
     Sqlite.Syntax.Parser
     Sqlite.Syntax.Pretty
     Sqlite.Syntax.Token
-  hs-source-dirs: src
+  hs-source-dirs:
+    sqlite-syntax/src
+    sqlite-syntax-parser/src
+    sqlite-syntax-pretty/src
   other-modules:
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement
