@@ -73,6 +73,7 @@ library
     Sqlite.Syntax.Internal.Parser.Rule.QualifiedTableName
     Sqlite.Syntax.Internal.Parser.Rule.Returning
     Sqlite.Syntax.Internal.Parser.Rule.Table
+    Sqlite.Syntax.Internal.Parser.Rule.Values
     Sqlite.Syntax.Internal.Parser.Utils
     Sqlite.Syntax.Internal.Type.Aliased
     Sqlite.Syntax.Internal.Type.AlterTableStatement
@@ -100,6 +101,7 @@ library
     Sqlite.Syntax.Internal.Type.SelectStatement
     Sqlite.Syntax.Internal.Type.Statement
     Sqlite.Syntax.Internal.Type.TransactionType
+    Sqlite.Syntax.Internal.Type.Values
     Sqlite.Syntax.Internal.Type.Window
     Sqlite.Syntax.Parser.Token
     TextParser

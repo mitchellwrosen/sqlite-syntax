@@ -5,13 +5,14 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Aliased (Aliased)
-import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression
-import Sqlite.Syntax.Internal.Type.FunctionCall
-import Sqlite.Syntax.Internal.Type.Namespaced
-import Sqlite.Syntax.Internal.Type.OrderingTerm
-import Sqlite.Syntax.Internal.Type.QualifiedTableName
 import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.CommonTableExpressions (CommonTableExpressions)
-import Sqlite.Syntax.Internal.Type.Window
+import {-# SOURCE #-} Sqlite.Syntax.Internal.Type.Expression (Expression)
+import Sqlite.Syntax.Internal.Type.FunctionCall (FunctionCall)
+import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
+import Sqlite.Syntax.Internal.Type.OrderingTerm (OrderingTerm)
+import Sqlite.Syntax.Internal.Type.QualifiedTableName (QualifiedTableName)
+import Sqlite.Syntax.Internal.Type.Values (Values)
+import Sqlite.Syntax.Internal.Type.Window (Window)
 import Prelude
 
 -- | https://sqlite.org/lang_select.html
@@ -109,7 +110,7 @@ data Select = Select
 -- @
 data SelectCore
   = SelectCore'Select Select
-  | SelectCore'Values (NonEmpty (NonEmpty Expression))
+  | SelectCore'Values Values
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/lang_select.html

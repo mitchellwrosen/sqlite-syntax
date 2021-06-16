@@ -16,6 +16,6 @@ import Prelude
 data InsertStatement = InsertStatement
   { commonTableExpressions :: CommonTableExpressions,
     onConflict :: OnConflict,
-    table :: Aliased Maybe (Columns [])
+    table :: Columns (Aliased Maybe) []
   }
   deriving stock (Eq, Generic, Show)

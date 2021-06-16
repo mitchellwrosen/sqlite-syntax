@@ -16,7 +16,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax
-import Sqlite.Syntax.Internal.Parser.Rule.Columns (columnRule)
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
 import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
@@ -27,6 +26,7 @@ import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
+import Sqlite.Syntax.Internal.Parser.Rule.Values (makeValuesRule)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Lexer (lex)
 import qualified Sqlite.Syntax.Parser.Token as Token
@@ -37,12 +37,10 @@ import Prelude hiding (Ordering, fail, lex, not, null)
 
 -- TODO simplify some things with defaults (e.g. missing distinct/all == all)
 -- TODO move signed-number to lexer probably
--- TODO name things *Parser
 -- TODO does 'many' need to be 'rule'd?
 -- TODO eliminate Maybes by using the defaults
 -- TODO make sure all of the make* things called multiple times aren't involved in mutual recursion
 -- TODO rm *Clause
--- TODO Parser -> Rule
 -- TODO quirks page says many keywords are valid identifiers..
 -- TODO combine Aliased/Named?
 
@@ -143,14 +141,16 @@ syntaxParser = mdo
   expressionRule <- makeExpressionRule selectStatementRule windowRule
   orderingTermRule <- Earley.rule (makeOrderingTermRule expressionRule)
   selectStatementRule <-
-    makeSelectStatementParser
+    makeSelectStatementRule
       commonTableExpressionsRule
       expressionRule
       orderingTermRule
       tableRule
+      valuesRule
       windowRule
   tableRule <- makeTableRule expressionRule selectStatementRule
-  windowRule <- Earley.rule (makeWindowParser expressionRule orderingTermRule)
+  valuesRule <- Earley.rule (makeValuesRule expressionRule)
+  windowRule <- Earley.rule (makeWindowRule expressionRule orderingTermRule)
 
   let columnDefinitionRule :: Rule r ColumnDefinition
       columnDefinitionRule =
@@ -172,8 +172,8 @@ syntaxParser = mdo
       returningRule =
         makeReturningRule expressionRule
 
-      statementParser :: Rule r Statement
-      statementParser =
+      statementRule :: Rule r Statement
+      statementRule =
         choice
           [ Statement'AlterTable <$> makeAlterTableStatement columnDefinitionRule,
             Statement'Analyze <$> analyzeStatement,
@@ -218,24 +218,24 @@ syntaxParser = mdo
   pure
     Syntax
       { synExpression = expressionRule,
-        synStatement = statementParser
+        synStatement = statementRule
       }
   where
-    makeWindowParser :: Rule r Expression -> Rule r OrderingTerm -> Rule r Window
-    makeWindowParser expressionRule orderingTermRule =
+    makeWindowRule :: Rule r Expression -> Rule r OrderingTerm -> Rule r Window
+    makeWindowRule expressionRule orderingTermRule =
       parens do
         Window
           <$> optional Token.identifier
           <*> optional (Token.partition *> Token.by *> commaSep1 expressionRule)
           <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
-          <*> choice [frameParser, pure defaultFrame]
+          <*> choice [frameRule, pure defaultFrame]
       where
         defaultFrame :: Frame
         defaultFrame =
           Frame Range (Preceding Nothing) CurrentRow ExcludeNoOthers
 
-        frameParser :: Rule r Frame
-        frameParser =
+        frameRule :: Rule r Frame
+        frameRule =
           ( \type_ (startingBoundary, endingBoundary) exclude ->
               Frame {type_, startingBoundary, endingBoundary, exclude}
           )
@@ -244,56 +244,56 @@ syntaxParser = mdo
                 Range <$ Token.range,
                 Rows <$ Token.rows
               ]
-            <*> frameBoundariesParser
-            <*> frameExcludeParser
+            <*> frameBoundariesRule
+            <*> frameExcludeRule
           where
-            frameBoundariesParser :: Rule r (FrameBoundary Identity Maybe, FrameBoundary Maybe Identity)
-            frameBoundariesParser =
+            frameBoundariesRule :: Rule r (FrameBoundary Identity Maybe, FrameBoundary Maybe Identity)
+            frameBoundariesRule =
               choice
                 [ (,)
                     <$> ( Token.between
                             *> choice
-                              [ currentRowParser,
-                                exprFollowingParser Identity,
-                                unboundedPrecedingParser,
-                                exprPrecedingParser Just
+                              [ currentRowRule,
+                                exprFollowingRule Identity,
+                                unboundedPrecedingRule,
+                                exprPrecedingRule Just
                               ]
                         )
                     <*> ( Token.and
                             *> choice
-                              [ currentRowParser,
-                                exprFollowingParser Just,
-                                unboundedFollowingParser,
-                                exprPrecedingParser Identity
+                              [ currentRowRule,
+                                exprFollowingRule Just,
+                                unboundedFollowingRule,
+                                exprPrecedingRule Identity
                               ]
                         ),
-                  (,CurrentRow) <$> currentRowParser,
-                  (,CurrentRow) <$> unboundedPrecedingParser,
-                  (,CurrentRow) <$> exprPrecedingParser Just
+                  (,CurrentRow) <$> currentRowRule,
+                  (,CurrentRow) <$> unboundedPrecedingRule,
+                  (,CurrentRow) <$> exprPrecedingRule Just
                 ]
               where
-                currentRowParser :: Rule r (FrameBoundary f g)
-                currentRowParser =
+                currentRowRule :: Rule r (FrameBoundary f g)
+                currentRowRule =
                   CurrentRow <$ (Token.current *> Token.row)
 
-                exprFollowingParser :: (Expression -> f Expression) -> Rule r (FrameBoundary f g)
-                exprFollowingParser f =
+                exprFollowingRule :: (Expression -> f Expression) -> Rule r (FrameBoundary f g)
+                exprFollowingRule f =
                   (Following . f) <$> (expressionRule <* Token.following)
 
-                exprPrecedingParser :: (Expression -> g Expression) -> Rule r (FrameBoundary f g)
-                exprPrecedingParser f =
+                exprPrecedingRule :: (Expression -> g Expression) -> Rule r (FrameBoundary f g)
+                exprPrecedingRule f =
                   (Preceding . f) <$> (expressionRule <* Token.preceding)
 
-                unboundedFollowingParser :: Rule r (FrameBoundary Maybe g)
-                unboundedFollowingParser =
+                unboundedFollowingRule :: Rule r (FrameBoundary Maybe g)
+                unboundedFollowingRule =
                   Following Nothing <$ (Token.unbounded *> Token.following)
 
-                unboundedPrecedingParser :: Rule r (FrameBoundary f Maybe)
-                unboundedPrecedingParser =
+                unboundedPrecedingRule :: Rule r (FrameBoundary f Maybe)
+                unboundedPrecedingRule =
                   Preceding Nothing <$ (Token.unbounded *> Token.preceding)
 
-            frameExcludeParser :: Rule r FrameExclude
-            frameExcludeParser =
+            frameExcludeRule :: Rule r FrameExclude
+            frameExcludeRule =
               choice
                 [ ExcludeCurrentRow <$ (Token.exclude *> Token.current *> Token.row),
                   ExcludeGroup <$ (Token.exclude *> Token.group),
@@ -330,16 +330,16 @@ makeColumnDefinitionRule expressionRule =
   ColumnDefinition
     <$> Token.identifier
     <*> optional Token.identifier
-    <*> many namedColumnConstraintParser
+    <*> many namedColumnConstraintRule
   where
-    namedColumnConstraintParser :: Rule r (Named ColumnConstraint)
-    namedColumnConstraintParser =
+    namedColumnConstraintRule :: Rule r (Named ColumnConstraint)
+    namedColumnConstraintRule =
       Named
         <$> optional (Token.constraint *> Token.identifier)
-        <*> columnConstraintParser
+        <*> columnConstraintRule
       where
-        columnConstraintParser :: Rule r ColumnConstraint
-        columnConstraintParser =
+        columnConstraintRule :: Rule r ColumnConstraint
+        columnConstraintRule =
           choice
             [ ColumnConstraint'Check <$> (Token.check *> parens expressionRule),
               ColumnConstraint'Collate <$> (Token.collate *> Token.identifier),
@@ -353,12 +353,12 @@ makeColumnDefinitionRule expressionRule =
               ColumnConstraint'Generated
                 <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expressionRule)
                 <*> optional generatedType,
-              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> optional onConflictParser),
+              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> optional onConflictRule),
               ColumnConstraint'PrimaryKey
                 <$> (Token.primary *> Token.key *> orderingRule)
-                <*> optional onConflictParser
+                <*> optional onConflictRule
                 <*> perhaps Token.autoincrement,
-              ColumnConstraint'Unique <$> (Token.unique *> optional onConflictParser)
+              ColumnConstraint'Unique <$> (Token.unique *> optional onConflictRule)
             ]
 
 makeCreateIndexStatement :: Rule r Expression -> Rule r CreateIndexStatement
@@ -384,25 +384,25 @@ makeCreateTableStatement columnDefinition expression selectStatement =
     <*> namespacedRule Token.identifier Token.identifier
     <*> choice
       [ Left <$> (Token.as *> selectStatement),
-        Right <$> tableDefinitionParser
+        Right <$> tableDefinitionRule
       ]
   where
-    tableDefinitionParser :: Rule r TableDefinition
-    tableDefinitionParser =
+    tableDefinitionRule :: Rule r TableDefinition
+    tableDefinitionRule =
       TableDefinition
         <$> (Token.leftParenthesis *> commaSep1 columnDefinition)
-        <*> many (Token.comma *> namedTableConstraintParser)
+        <*> many (Token.comma *> namedTableConstraintRule)
         <* Token.rightParenthesis
         <*> perhaps (Token.without *> Token.rowid)
       where
-        namedTableConstraintParser :: Rule r (Named TableConstraint)
-        namedTableConstraintParser =
+        namedTableConstraintRule :: Rule r (Named TableConstraint)
+        namedTableConstraintRule =
           Named
             <$> optional (Token.constraint *> Token.identifier)
-            <*> tableConstraintParser
+            <*> tableConstraintRule
           where
-            tableConstraintParser :: Rule r TableConstraint
-            tableConstraintParser =
+            tableConstraintRule :: Rule r TableConstraint
+            tableConstraintRule =
               choice
                 [ TableConstraint'Check <$> (Token.check *> parens expression),
                   TableConstraint'ForeignKey
@@ -410,15 +410,15 @@ makeCreateTableStatement columnDefinition expression selectStatement =
                     <*> foreignKeyClauseRule,
                   TableConstraint'PrimaryKey
                     <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumnRule))
-                    <*> optional onConflictParser,
+                    <*> optional onConflictRule,
                   TableConstraint'Unique
                     <$> (Token.unique *> parens (commaSep1 indexedColumnRule))
-                    <*> optional onConflictParser
+                    <*> optional onConflictRule
                 ]
 
 makeExpressionRule :: Rule r SelectStatement -> Rule r Window -> Earley.Grammar r (Rule r Expression)
 makeExpressionRule selectStatement windowRule = mdo
-  filterClauseParser <- Earley.rule (Token.filter *> parens (Token.where_ *> expression))
+  filterClauseRule <- Earley.rule (Token.filter *> parens (Token.where_ *> expression))
 
   expression <-
     Earley.rule do
@@ -444,15 +444,18 @@ makeExpressionRule selectStatement windowRule = mdo
         [ Expression'AggregateDistinctFunctionCall
             <$> ( AggregateDistinctFunctionCallExpression
                     <$> functionCallRule (Identity <$> (Token.distinct *> expression))
-                    <*> optional filterClauseParser
+                    <*> optional filterClauseRule
                 ),
-          Expression'Case <$> caseExpressionParser expression,
+          Expression'Case <$> caseExpressionRule expression,
           Expression'Cast
             <$> ( CastExpression
                     <$> (Token.cast *> Token.leftParenthesis *> expression)
                     <*> (Token.as *> Token.identifier)
                 ),
-          Expression'Column <$> columnRule,
+          Expression'Column
+            <$> namespacedRule
+              (Identity <$> namespacedRule Token.identifier Token.identifier)
+              (Identity <$> Token.identifier),
           Expression'Exists <$> (Token.exists *> parens selectStatement),
           Expression'FunctionCall
             <$> ( FunctionCallExpression
@@ -462,7 +465,7 @@ makeExpressionRule selectStatement windowRule = mdo
                             FunctionArguments'Wildcard <$ Token.asterisk
                           ]
                       )
-                    <*> optional filterClauseParser
+                    <*> optional filterClauseRule
                     <*> optional
                       ( Token.over
                           *> choice
@@ -472,8 +475,8 @@ makeExpressionRule selectStatement windowRule = mdo
                       )
                 ),
           Expression'LiteralValue <$> literalValueRule,
-          Expression'Parameter <$> parameterParser,
-          Expression'Raise <$> raiseParser,
+          Expression'Parameter <$> parameterRule,
+          Expression'Raise <$> raiseRule,
           Expression'RowValue
             <$> ( RowValue
                     <$> (Token.leftParenthesis *> expression)
@@ -603,8 +606,8 @@ makeExpressionRule selectStatement windowRule = mdo
         e2
       ]
 
-    caseExpressionParser :: Rule r Expression -> Rule r CaseExpression
-    caseExpressionParser expressionRule =
+    caseExpressionRule :: Rule r Expression -> Rule r CaseExpression
+    caseExpressionRule expressionRule =
       CaseExpression
         <$> (Token.case_ *> optional expressionRule)
         <*> some ((,) <$> (Token.when *> expressionRule) <*> (Token.then_ *> expressionRule))
@@ -614,8 +617,8 @@ makeExpressionRule selectStatement windowRule = mdo
           ]
         <* Token.end
 
-    parameterParser :: Rule r Parameter
-    parameterParser =
+    parameterRule :: Rule r Parameter
+    parameterRule =
       choice
         [ Parameter'Named <$> Token.namedParameter,
           Parameter'Ordinal <$> Token.parameter
@@ -642,8 +645,8 @@ literalValueRule =
       String <$> Token.string
     ]
 
-onConflictParser :: Rule r OnConflict
-onConflictParser =
+onConflictRule :: Rule r OnConflict
+onConflictRule =
   Token.on
     *> Token.conflict
     *> choice
@@ -654,8 +657,8 @@ onConflictParser =
         OnConflictRollback <$ Token.rollback
       ]
 
-raiseParser :: Rule r Raise
-raiseParser =
+raiseRule :: Rule r Raise
+raiseRule =
   Token.raise *> parens (choice xs)
   where
     xs =
@@ -683,102 +686,108 @@ data ReturningClauseItem
 makeReturningClauseItem :: Rule r Expression -> Rule r ReturningClauseItem
 makeReturningClauseItem = undefined
 
-makeSelectStatementParser ::
+makeSelectStatementRule ::
   forall r.
   Rule r CommonTableExpressions ->
   Rule r Expression ->
   Rule r OrderingTerm ->
   Rule r Table ->
+  Rule r Values ->
   Rule r Window ->
   Earley.Grammar r (Rule r SelectStatement)
-makeSelectStatementParser commonTableExpressionsRule expressionRule orderingTermRule tableRule windowRule = mdo
-  compoundSelectParser <- makeCompoundSelectRule tableRule
-  selectStatementRule <-
-    Earley.rule do
-      SelectStatement
-        <$> optional commonTableExpressionsRule
-        <*> compoundSelectParser
-        <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
-        <*> optional limitRule
-  pure selectStatementRule
-  where
-    limitRule :: Rule r Limit
-    limitRule =
-      munge
-        <$> (Token.limit *> expressionRule)
-        <*> optional
-          ( choice
-              [ Left <$> (Token.offset *> expressionRule),
-                Right <$> (Token.comma *> expressionRule)
-              ]
-          )
-      where
-        munge :: Expression -> Maybe (Either Expression Expression) -> Limit
-        munge e1 = \case
-          -- LIMIT x
-          Nothing -> Limit e1 Nothing
-          -- LIMIT x OFFSET y
-          Just (Left e2) -> Limit e1 (Just e2)
-          -- LIMIT y, x
-          Just (Right e2) -> Limit e2 (Just e1)
+makeSelectStatementRule
+  commonTableExpressionsRule
+  expressionRule
+  orderingTermRule
+  tableRule
+  valuesRule
+  windowRule = mdo
+    compoundSelectRule <- makeCompoundSelectRule
+    selectStatementRule <-
+      Earley.rule do
+        SelectStatement
+          <$> optional commonTableExpressionsRule
+          <*> compoundSelectRule
+          <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
+          <*> optional limitRule
+    pure selectStatementRule
+    where
+      limitRule :: Rule r Limit
+      limitRule =
+        munge
+          <$> (Token.limit *> expressionRule)
+          <*> optional
+            ( choice
+                [ Left <$> (Token.offset *> expressionRule),
+                  Right <$> (Token.comma *> expressionRule)
+                ]
+            )
+        where
+          munge :: Expression -> Maybe (Either Expression Expression) -> Limit
+          munge e1 = \case
+            -- LIMIT x
+            Nothing -> Limit e1 Nothing
+            -- LIMIT x OFFSET y
+            Just (Left e2) -> Limit e1 (Just e2)
+            -- LIMIT y, x
+            Just (Right e2) -> Limit e2 (Just e1)
 
-    makeCompoundSelectRule :: Rule r Table -> Earley.Grammar r (Rule r CompoundSelect)
-    makeCompoundSelectRule tableParser = mdo
-      compoundSelectParser <-
-        Earley.rule do
-          choice
-            [ CompoundSelect <$> selectCoreParser,
-              Except <$> compoundSelectParser <*> (Token.except *> selectCoreParser),
-              Intersect <$> compoundSelectParser <*> (Token.intersect *> selectCoreParser),
-              Union <$> compoundSelectParser <*> (Token.union *> selectCoreParser),
-              UnionAll <$> compoundSelectParser <*> (Token.union *> Token.all *> selectCoreParser)
-            ]
-      selectParser <-
-        Earley.rule do
-          Select
-            <$> distinctParser
-            <*> commaSep1 resultColumnRule
-            <*> optional (Token.from *> tableParser)
-            <*> optional (Token.where_ *> expressionRule)
-            <*> optional groupByRule
-            <*> optional windowClauseParser
-      selectCoreParser <-
-        Earley.rule do
-          choice
-            [ SelectCore'Select <$> selectParser,
-              SelectCore'Values <$> valuesParser
-            ]
-      valuesParser <- Earley.rule (Token.values *> commaSep1 (parens (commaSep1 expressionRule)))
-      pure compoundSelectParser
-      where
-        distinctParser :: Rule r Bool
-        distinctParser =
-          Token.select
-            *> choice
-              [ True <$ Token.distinct,
-                False <$ Token.all,
-                pure False
+      makeCompoundSelectRule :: Earley.Grammar r (Rule r CompoundSelect)
+      makeCompoundSelectRule = mdo
+        compoundSelectRule <-
+          Earley.rule do
+            choice
+              [ CompoundSelect <$> selectCoreRule,
+                Except <$> compoundSelectRule <*> (Token.except *> selectCoreRule),
+                Intersect <$> compoundSelectRule <*> (Token.intersect *> selectCoreRule),
+                Union <$> compoundSelectRule <*> (Token.union *> selectCoreRule),
+                UnionAll <$> compoundSelectRule <*> (Token.union *> Token.all *> selectCoreRule)
               ]
-        groupByRule :: Rule r GroupBy
-        groupByRule =
-          GroupBy
-            <$> (Token.group *> Token.by *> commaSep1 expressionRule)
-            <*> optional (Token.having *> expressionRule)
-        resultColumnRule :: Rule r ResultColumn
-        resultColumnRule =
-          choice
-            [ ResultColumn'Expression
-                <$> (Aliased <$> expressionRule <*> optional (perhaps_ Token.as *> Token.identifier)),
-              ResultColumn'Wildcard <$> namespacedRule Token.identifier (() <$ Token.asterisk)
-            ]
-        windowClauseParser :: Rule r (NonEmpty (Aliased Identity Window))
-        windowClauseParser =
-          Token.window
-            *> commaSep1
-              ( (\x y -> Aliased y (Identity x))
-                  <$> Token.identifier
-                  <*> (Token.as *> windowRule)
-              )
+        selectRule <-
+          Earley.rule do
+            Select
+              <$> distinctRule
+              <*> commaSep1 resultColumnRule
+              <*> optional (Token.from *> tableRule)
+              <*> optional (Token.where_ *> expressionRule)
+              <*> optional groupByRule
+              <*> optional windowClauseRule
+        selectCoreRule <-
+          Earley.rule do
+            choice
+              [ SelectCore'Select <$> selectRule,
+                SelectCore'Values <$> valuesRule
+              ]
+        pure compoundSelectRule
+        where
+          distinctRule :: Rule r Bool
+          distinctRule =
+            Token.select
+              *> choice
+                [ True <$ Token.distinct,
+                  False <$ Token.all,
+                  pure False
+                ]
+          groupByRule :: Rule r GroupBy
+          groupByRule =
+            GroupBy
+              <$> (Token.group *> Token.by *> commaSep1 expressionRule)
+              <*> optional (Token.having *> expressionRule)
+          resultColumnRule :: Rule r ResultColumn
+          resultColumnRule =
+            choice
+              [ ResultColumn'Expression
+                  <$> (Aliased <$> expressionRule <*> optional (perhaps_ Token.as *> Token.identifier)),
+                ResultColumn'Wildcard <$> namespacedRule Token.identifier (() <$ Token.asterisk)
+              ]
+          windowClauseRule :: Rule r (NonEmpty (Aliased Identity Window))
+          windowClauseRule =
+            Token.window
+              *> commaSep1
+                ( (\x y -> Aliased y (Identity x))
+                    <$> Token.identifier
+                    <*> (Token.as *> windowRule)
+                )
 
 signRule :: Rule r Sign
 signRule =

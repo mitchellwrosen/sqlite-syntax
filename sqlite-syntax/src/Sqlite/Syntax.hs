@@ -60,6 +60,7 @@ module Sqlite.Syntax
     TableConstraint (..),
     TableDefinition (..),
     TransactionType (..),
+    Values (..),
     Window (..),
   )
 where
@@ -88,4 +89,5 @@ import Sqlite.Syntax.Internal.Type.Returning
 import Sqlite.Syntax.Internal.Type.SelectStatement
 import Sqlite.Syntax.Internal.Type.Statement
 import Sqlite.Syntax.Internal.Type.TransactionType
+import Sqlite.Syntax.Internal.Type.Values
 import Sqlite.Syntax.Internal.Type.Window

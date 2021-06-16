@@ -4,6 +4,7 @@ module Sqlite.Syntax.Internal.Type.ForeignKeyClause
   )
 where
 
+import Data.Functor.Identity (Identity)
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Columns (Columns)
 import Prelude
@@ -26,7 +27,7 @@ data Action
 --
 -- TODO rename?
 data ForeignKeyClause = ForeignKeyClause
-  { references :: Columns [],
+  { references :: Columns Identity [],
     onDelete :: Action,
     onUpdate :: Action,
     deferred :: Bool

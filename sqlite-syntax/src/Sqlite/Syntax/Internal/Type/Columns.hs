@@ -6,5 +6,5 @@ where
 import Data.Text (Text)
 import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 
-type Columns f =
-  Namespaced (Namespaced Text Text) (f Text)
+type Columns f g =
+  Namespaced (f (Namespaced Text Text)) (g Text)

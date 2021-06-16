@@ -99,7 +99,7 @@ data Expression
   | -- | /∙ COLLATE ∙/
     Expression'Collate CollateExpression
   | -- | /∙.∙.∙/
-    Expression'Column (Columns Identity)
+    Expression'Column (Columns Identity Identity)
   | -- | /∙ || ∙/
     Expression'Concatenate Expression Expression
   | -- | /∙ / ∙/
