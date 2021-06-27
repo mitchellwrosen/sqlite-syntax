@@ -25,6 +25,7 @@ import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
+import Sqlite.Syntax.Internal.Parser.Rule.SelectStatement (makeCompoundSelectRule, makeSelectStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Values (makeValuesRule)
 import Sqlite.Syntax.Internal.Parser.Utils
@@ -138,16 +139,12 @@ data Syntax r = Syntax
 syntaxParser :: forall r. Earley.Grammar r (Syntax r)
 syntaxParser = mdo
   commonTableExpressionsRule <- Earley.rule (makeCommonTableExpressionsRule selectStatementRule)
+  compoundSelectRule <- makeCompoundSelectRule expressionRule tableRule valuesRule windowRule
   expressionRule <- makeExpressionRule selectStatementRule windowRule
   orderingTermRule <- Earley.rule (makeOrderingTermRule expressionRule)
   selectStatementRule <-
-    makeSelectStatementRule
-      commonTableExpressionsRule
-      expressionRule
-      orderingTermRule
-      tableRule
-      valuesRule
-      windowRule
+    Earley.rule do
+      makeSelectStatementRule commonTableExpressionsRule compoundSelectRule expressionRule orderingTermRule
   tableRule <- makeTableRule expressionRule selectStatementRule
   valuesRule <- Earley.rule (makeValuesRule expressionRule)
   windowRule <- Earley.rule (makeWindowRule expressionRule orderingTermRule)
@@ -695,109 +692,6 @@ data ReturningClauseItem
 
 makeReturningClauseItem :: Rule r Expression -> Rule r ReturningClauseItem
 makeReturningClauseItem = undefined
-
-makeSelectStatementRule ::
-  forall r.
-  Rule r CommonTableExpressions ->
-  Rule r Expression ->
-  Rule r OrderingTerm ->
-  Rule r Table ->
-  Rule r Values ->
-  Rule r Window ->
-  Earley.Grammar r (Rule r SelectStatement)
-makeSelectStatementRule
-  commonTableExpressionsRule
-  expressionRule
-  orderingTermRule
-  tableRule
-  valuesRule
-  windowRule = mdo
-    compoundSelectRule <- makeCompoundSelectRule
-    selectStatementRule <-
-      Earley.rule do
-        SelectStatement
-          <$> optional commonTableExpressionsRule
-          <*> compoundSelectRule
-          <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
-          <*> optional limitRule
-    pure selectStatementRule
-    where
-      limitRule :: Rule r Limit
-      limitRule =
-        munge
-          <$> (Token.limit *> expressionRule)
-          <*> optional
-            ( choice
-                [ Left <$> (Token.offset *> expressionRule),
-                  Right <$> (Token.comma *> expressionRule)
-                ]
-            )
-        where
-          munge :: Expression -> Maybe (Either Expression Expression) -> Limit
-          munge e1 = \case
-            -- LIMIT x
-            Nothing -> Limit e1 Nothing
-            -- LIMIT x OFFSET y
-            Just (Left e2) -> Limit e1 (Just e2)
-            -- LIMIT y, x
-            Just (Right e2) -> Limit e2 (Just e1)
-
-      makeCompoundSelectRule :: Earley.Grammar r (Rule r CompoundSelect)
-      makeCompoundSelectRule = mdo
-        compoundSelectRule <-
-          Earley.rule do
-            choice
-              [ CompoundSelect <$> selectCoreRule,
-                Except <$> compoundSelectRule <*> (Token.except *> selectCoreRule),
-                Intersect <$> compoundSelectRule <*> (Token.intersect *> selectCoreRule),
-                Union <$> compoundSelectRule <*> (Token.union *> selectCoreRule),
-                UnionAll <$> compoundSelectRule <*> (Token.union *> Token.all *> selectCoreRule)
-              ]
-        selectRule <-
-          Earley.rule do
-            Select
-              <$> distinctRule
-              <*> commaSep1 resultColumnRule
-              <*> optional (Token.from *> tableRule)
-              <*> optional (Token.where_ *> expressionRule)
-              <*> optional groupByRule
-              <*> optional windowClauseRule
-        selectCoreRule <-
-          Earley.rule do
-            choice
-              [ SelectCore'Select <$> selectRule,
-                SelectCore'Values <$> valuesRule
-              ]
-        pure compoundSelectRule
-        where
-          distinctRule :: Rule r Bool
-          distinctRule =
-            Token.select
-              *> choice
-                [ True <$ Token.distinct,
-                  False <$ Token.all,
-                  pure False
-                ]
-          groupByRule :: Rule r GroupBy
-          groupByRule =
-            GroupBy
-              <$> (Token.group *> Token.by *> commaSep1 expressionRule)
-              <*> optional (Token.having *> expressionRule)
-          resultColumnRule :: Rule r ResultColumn
-          resultColumnRule =
-            choice
-              [ ResultColumn'Expression
-                  <$> (Aliased <$> expressionRule <*> optional (perhaps_ Token.as *> Token.identifier)),
-                ResultColumn'Wildcard <$> namespacedRule Token.identifier (() <$ Token.asterisk)
-              ]
-          windowClauseRule :: Rule r (NonEmpty (Aliased Identity Window))
-          windowClauseRule =
-            Token.window
-              *> commaSep1
-                ( (\x y -> Aliased y (Identity x))
-                    <$> Token.identifier
-                    <*> (Token.as *> windowRule)
-                )
 
 signRule :: Rule r Sign
 signRule =

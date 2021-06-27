@@ -61,6 +61,7 @@ library
     sqlite-syntax-parser/src
     sqlite-syntax-pretty/src
   other-modules:
+    Sqlite.Syntax.Internal.Parser.Rule.Aliased
     Sqlite.Syntax.Internal.Parser.Rule.Columns
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement
@@ -72,6 +73,7 @@ library
     Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm
     Sqlite.Syntax.Internal.Parser.Rule.QualifiedTableName
     Sqlite.Syntax.Internal.Parser.Rule.Returning
+    Sqlite.Syntax.Internal.Parser.Rule.SelectStatement
     Sqlite.Syntax.Internal.Parser.Rule.Table
     Sqlite.Syntax.Internal.Parser.Rule.Values
     Sqlite.Syntax.Internal.Parser.Utils

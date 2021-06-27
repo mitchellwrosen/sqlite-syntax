@@ -5,10 +5,10 @@ where
 
 import Control.Applicative (optional)
 import Control.Applicative.Combinators (choice)
+import Sqlite.Syntax.Internal.Parser.Rule.Aliased (asAliasRule')
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
 import Sqlite.Syntax.Internal.Parser.Rule.QualifiedTableName (qualifiedTableNameRule)
 import Sqlite.Syntax.Internal.Parser.Utils
-import Sqlite.Syntax.Internal.Type.Aliased
 import Sqlite.Syntax.Internal.Type.Expression (Expression)
 import Sqlite.Syntax.Internal.Type.SelectStatement (JoinConstraint (..), SelectStatement, Table (..))
 import qualified Sqlite.Syntax.Parser.Token as Token
@@ -51,13 +51,8 @@ makeTableRule expressionRule selectStatementRule = mdo
     Earley.rule do
       choice
         [ Table <$> qualifiedTableNameRule,
-          Table'Function
-            <$> ( Aliased
-                    <$> functionCallRule (commaSep1 expressionRule)
-                    <*> optional (perhaps_ Token.as *> Token.identifier)
-                ),
-          Table'Subquery
-            <$> (Aliased <$> parens selectStatementRule <*> optional (perhaps_ Token.as *> Token.identifier)),
+          Table'Function <$> asAliasRule' (functionCallRule (commaSep1 expressionRule)),
+          Table'Subquery <$> asAliasRule' (parens selectStatementRule),
           parens tableRule
         ]
   pure tableRule

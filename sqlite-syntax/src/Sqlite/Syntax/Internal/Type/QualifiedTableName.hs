@@ -11,8 +11,8 @@ import Sqlite.Syntax.Internal.Type.Namespaced
 import Prelude
 
 data IndexedBy
-  = IndexedBy'IndexedBy Text
-  | IndexedBy'NotIndexed
+  = IndexedBy Text
+  | NotIndexed
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/qualified-table-name.html
