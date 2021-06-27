@@ -14,7 +14,7 @@ import Sqlite.Syntax.Internal.Type.ForeignKeyClause (ForeignKeyClause)
 import Sqlite.Syntax.Internal.Type.IndexedColumn (IndexedColumn)
 import Sqlite.Syntax.Internal.Type.Named (Named)
 import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
-import Sqlite.Syntax.Internal.Type.OnConflict (OnConflict)
+import Sqlite.Syntax.Internal.Type.OnConflict (ConflictResolution)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
 import Prelude
 
@@ -30,8 +30,8 @@ data CreateTableStatement = CreateTableStatement
 data TableConstraint
   = TableConstraint'Check Expression
   | TableConstraint'ForeignKey (NonEmpty Text) ForeignKeyClause
-  | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) (Maybe OnConflict)
-  | TableConstraint'Unique (NonEmpty IndexedColumn) (Maybe OnConflict)
+  | TableConstraint'PrimaryKey (NonEmpty IndexedColumn) ConflictResolution
+  | TableConstraint'Unique (NonEmpty IndexedColumn) ConflictResolution
   deriving stock (Eq, Generic, Show)
 
 data TableDefinition = TableDefinition

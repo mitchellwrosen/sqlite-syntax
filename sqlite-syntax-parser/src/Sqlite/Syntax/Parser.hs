@@ -353,13 +353,17 @@ makeColumnDefinitionRule expressionRule =
               ColumnConstraint'Generated
                 <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expressionRule)
                 <*> optional generatedType,
-              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> optional onConflictRule),
+              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> onConflictRule),
               ColumnConstraint'PrimaryKey
                 <$> (Token.primary *> Token.key *> orderingRule)
-                <*> optional onConflictRule
+                <*> onConflictRule
                 <*> perhaps Token.autoincrement,
-              ColumnConstraint'Unique <$> (Token.unique *> optional onConflictRule)
+              ColumnConstraint'Unique <$> (Token.unique *> onConflictRule)
             ]
+          where
+            onConflictRule :: Rule r ConflictResolution
+            onConflictRule =
+              makeConflictResolutionRule (Token.on *> Token.conflict)
 
 makeCreateIndexStatement :: Rule r Expression -> Rule r CreateIndexStatement
 makeCreateIndexStatement expression =
@@ -410,11 +414,15 @@ makeCreateTableStatement columnDefinition expression selectStatement =
                     <*> foreignKeyClauseRule,
                   TableConstraint'PrimaryKey
                     <$> (Token.primary *> Token.key *> parens (commaSep1 indexedColumnRule))
-                    <*> optional onConflictRule,
+                    <*> onConflictRule,
                   TableConstraint'Unique
                     <$> (Token.unique *> parens (commaSep1 indexedColumnRule))
-                    <*> optional onConflictRule
+                    <*> onConflictRule
                 ]
+              where
+                onConflictRule :: Rule r ConflictResolution
+                onConflictRule =
+                  makeConflictResolutionRule (Token.on *> Token.conflict)
 
 makeExpressionRule :: Rule r SelectStatement -> Rule r Window -> Earley.Grammar r (Rule r Expression)
 makeExpressionRule selectStatement windowRule = mdo
@@ -624,6 +632,20 @@ makeExpressionRule selectStatement windowRule = mdo
           Parameter'Ordinal <$> Token.parameter
         ]
 
+makeConflictResolutionRule :: Rule r a -> Rule r ConflictResolution
+makeConflictResolutionRule prefixRule =
+  choice
+    [ prefixRule
+        *> choice
+          [ Abort <$ Token.abort,
+            Fail <$ Token.fail,
+            Ignore <$ Token.ignore,
+            Replace <$ Token.replace,
+            Rollback <$ Token.rollback
+          ],
+      pure Abort
+    ]
+
 generatedType :: Rule r GeneratedType
 generatedType =
   choice
@@ -644,18 +666,6 @@ literalValueRule =
       Number <$> Token.number,
       String <$> Token.string
     ]
-
-onConflictRule :: Rule r OnConflict
-onConflictRule =
-  Token.on
-    *> Token.conflict
-    *> choice
-      [ OnConflictAbort <$ Token.abort,
-        OnConflictFail <$ Token.fail,
-        OnConflictIgnore <$ Token.ignore,
-        OnConflictReplace <$ Token.replace,
-        OnConflictRollback <$ Token.rollback
-      ]
 
 raiseRule :: Rule r Raise
 raiseRule =

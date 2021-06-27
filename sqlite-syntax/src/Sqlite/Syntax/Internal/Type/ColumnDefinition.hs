@@ -14,7 +14,7 @@ import Sqlite.Syntax.Internal.Type.Expression (Expression)
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause (ForeignKeyClause)
 import Sqlite.Syntax.Internal.Type.LiteralValue (LiteralValue)
 import Sqlite.Syntax.Internal.Type.Named (Named)
-import Sqlite.Syntax.Internal.Type.OnConflict (OnConflict)
+import Sqlite.Syntax.Internal.Type.OnConflict (ConflictResolution)
 import Sqlite.Syntax.Internal.Type.Ordering (Ordering)
 import Prelude hiding (Ordering)
 
@@ -24,9 +24,9 @@ data ColumnConstraint
   | ColumnConstraint'Default Default
   | ColumnConstraint'ForeignKey ForeignKeyClause
   | ColumnConstraint'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraint'NotNull (Maybe OnConflict)
-  | ColumnConstraint'PrimaryKey Ordering (Maybe OnConflict) Bool
-  | ColumnConstraint'Unique (Maybe OnConflict)
+  | ColumnConstraint'NotNull ConflictResolution
+  | ColumnConstraint'PrimaryKey Ordering ConflictResolution Bool
+  | ColumnConstraint'Unique ConflictResolution
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/column-def.html
