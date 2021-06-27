@@ -11,6 +11,7 @@ import Sqlite.Syntax.Internal.Type.AttachStatement (AttachStatement)
 import Sqlite.Syntax.Internal.Type.CreateIndexStatement (CreateIndexStatement)
 import Sqlite.Syntax.Internal.Type.CreateTableStatement (CreateTableStatement)
 import Sqlite.Syntax.Internal.Type.DeleteStatement (DeleteStatement)
+import Sqlite.Syntax.Internal.Type.InsertStatement (InsertStatement)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
 import Sqlite.Syntax.Internal.Type.TransactionType (TransactionType)
 import Prelude
@@ -41,7 +42,7 @@ data Statement
   | Statement'DropTable TODO
   | Statement'DropTrigger TODO
   | Statement'DropView TODO
-  | Statement'Insert TODO
+  | Statement'Insert InsertStatement
   | Statement'Pragma TODO
   | Statement'Reindex TODO
   | Statement'Release TODO

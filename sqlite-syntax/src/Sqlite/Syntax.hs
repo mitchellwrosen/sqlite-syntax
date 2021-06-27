@@ -14,6 +14,7 @@ module Sqlite.Syntax
     CommonTableExpressions (..),
     CompoundSelect (..),
     ConflictResolution (..),
+    ConflictTarget (..),
     CreateIndexStatement (..),
     CreateTableStatement (..),
     Default (..),
@@ -34,6 +35,8 @@ module Sqlite.Syntax
     InTableExpression (..),
     InValuesExpression (..),
     IndexedColumn (..),
+    Insert (..),
+    InsertStatement (..),
     JoinConstraint (..),
     Limit (..),
     LiteralValue (..),
@@ -60,6 +63,9 @@ module Sqlite.Syntax
     TableConstraint (..),
     TableDefinition (..),
     TransactionType (..),
+    UpsertAction (..),
+    UpsertClause (..),
+    UpsertClauses (..),
     Values (..),
     Window (..),
   )
@@ -78,6 +84,7 @@ import Sqlite.Syntax.Internal.Type.Expression
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import Sqlite.Syntax.Internal.Type.FunctionCall
 import Sqlite.Syntax.Internal.Type.IndexedColumn
+import Sqlite.Syntax.Internal.Type.InsertStatement
 import Sqlite.Syntax.Internal.Type.LiteralValue
 import Sqlite.Syntax.Internal.Type.Named
 import Sqlite.Syntax.Internal.Type.Namespaced

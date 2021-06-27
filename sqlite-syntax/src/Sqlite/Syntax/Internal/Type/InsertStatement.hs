@@ -1,6 +1,10 @@
 module Sqlite.Syntax.Internal.Type.InsertStatement
-  ( Insert (..),
+  ( ConflictTarget (..),
+    Insert (..),
     InsertStatement (..),
+    UpsertAction (..),
+    UpsertClause (..),
+    UpsertClauses (..),
   )
 where
 
@@ -59,6 +63,5 @@ deriving instance Show (f ConflictTarget) => Show (UpsertClause f)
 
 -- | https://sqlite.org/lang_upsert.html
 data UpsertClauses
-  = UpsertClauseNil (UpsertClause Maybe)
-  | UpsertClauseCons (UpsertClause Identity) UpsertClauses
+  = UpsertClauses [UpsertClause Identity] (UpsertClause Maybe)
   deriving stock (Eq, Generic, Show)

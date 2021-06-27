@@ -17,6 +17,7 @@ import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
+import Sqlite.Syntax.Internal.Parser.Rule.CompoundSelect (makeCompoundSelectRule)
 import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
@@ -25,7 +26,9 @@ import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
-import Sqlite.Syntax.Internal.Parser.Rule.SelectStatement (makeCompoundSelectRule, makeSelectStatementRule)
+import Sqlite.Syntax.Internal.Parser.Rule.Select (makeSelectRule)
+import Sqlite.Syntax.Internal.Parser.Rule.SelectCore (makeSelectCoreRule)
+import Sqlite.Syntax.Internal.Parser.Rule.SelectStatement (makeSelectStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Values (makeValuesRule)
 import Sqlite.Syntax.Internal.Parser.Utils
@@ -139,9 +142,11 @@ data Syntax r = Syntax
 syntaxParser :: forall r. Earley.Grammar r (Syntax r)
 syntaxParser = mdo
   commonTableExpressionsRule <- Earley.rule (makeCommonTableExpressionsRule selectStatementRule)
-  compoundSelectRule <- makeCompoundSelectRule expressionRule tableRule valuesRule windowRule
+  compoundSelectRule <- Earley.rule (makeCompoundSelectRule compoundSelectRule selectCoreRule)
   expressionRule <- makeExpressionRule selectStatementRule windowRule
   orderingTermRule <- Earley.rule (makeOrderingTermRule expressionRule)
+  selectRule <- Earley.rule (makeSelectRule expressionRule tableRule windowRule)
+  selectCoreRule <- Earley.rule (makeSelectCoreRule selectRule valuesRule)
   selectStatementRule <-
     Earley.rule do
       makeSelectStatementRule commonTableExpressionsRule compoundSelectRule expressionRule orderingTermRule
