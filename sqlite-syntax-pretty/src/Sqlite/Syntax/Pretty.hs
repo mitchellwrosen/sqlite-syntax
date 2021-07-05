@@ -5,9 +5,9 @@ module Sqlite.Syntax.Pretty
   )
 where
 
-import Data.Foldable (toList)
 import Data.Functor.Identity (Identity (..))
 import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -26,7 +26,7 @@ list =
 
 list1 :: NonEmpty (Doc a) -> Doc a
 list1 =
-  list . toList
+  list . NonEmpty.toList
 
 parenthesized :: Doc a -> Doc a
 parenthesized x =
@@ -40,6 +40,23 @@ prettyAsAlias = \case
   Aliased x (Just y) -> hsep [pretty x, "AS", pretty y]
 
 --
+
+instance Pretty CaseExpression where
+  pretty CaseExpression {base, cases, else_} =
+    hardlines
+      ( "CASE" <> maybe mempty (group . pretty) base :
+        indent 2 (hardlines (map prettyCase (NonEmpty.toList cases))) :
+        indent 2 ("ELSE" <+> pretty else_) :
+        ["END"]
+      )
+    where
+      prettyCase :: (Expression, Expression) -> Doc a
+      prettyCase (x, y) =
+        "WHEN" <+> group (pretty x) <+> "THEN" <+> group (pretty y)
+
+instance Pretty CastExpression where
+  pretty CastExpression {expression, type_} =
+    "CAST" <+> parenthesized (pretty expression <+> "AS" <+> pretty type_)
 
 instance Pretty CommonTableExpressions where
   pretty = undefined
@@ -67,12 +84,21 @@ instance Pretty Expression where
   pretty = \case
     Expression'AggregateDistinctFunctionCall {} -> undefined
     Expression'And x y -> binop "AND" x y
-    Expression'Between {} -> undefined
+    Expression'Between x y z ->
+      parenthesized
+        ( hsep
+            [ parenthesized (pretty x),
+              "BETWEEN",
+              parenthesized (pretty y),
+              "AND",
+              parenthesized (pretty z)
+            ]
+        )
     Expression'BitwiseAnd x y -> binop "&" x y
     Expression'BitwiseNegate x -> unop "~" x
     Expression'BitwiseOr x y -> binop "|" x y
-    Expression'Case {} -> undefined
-    Expression'Cast {} -> undefined
+    Expression'Case x -> pretty x
+    Expression'Cast x -> pretty x
     Expression'Collate {} -> undefined
     Expression'Column x -> pretty x
     Expression'Concatenate x y -> binop "||" x y
@@ -168,7 +194,8 @@ instance Pretty JoinConstraint where
     Using _ -> undefined
 
 instance Pretty Limit where
-  pretty = undefined
+  pretty Limit {limit, offset} =
+    "LIMIT" <+> pretty limit <> maybe mempty (\o -> hardline <> "OFFSET" <+> pretty o) offset
 
 instance Pretty LiteralValue where
   pretty = \case

@@ -32,8 +32,8 @@ parseGoldenFiles = do
             Parser.AmbiguousParse x -> pPrint x
         Right statement -> do
           print (pretty statement)
-          putStrLn ""
-          pPrint statement
+          -- putStrLn ""
+          -- pPrint statement
           _ <- getLine
           loop files
 
