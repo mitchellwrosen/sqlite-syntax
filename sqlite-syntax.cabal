@@ -111,6 +111,15 @@ library
     Sqlite.Syntax.Parser.Token
     TextParser
 
+executable debug-watch
+  import: component
+  build-depends:
+    hinotify,
+    pretty-simple,
+    sqlite-syntax,
+  hs-source-dirs: app
+  main-is: DebugWatch.hs
+
 test-suite tests
   import: component
   build-depends:
