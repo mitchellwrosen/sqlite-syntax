@@ -115,9 +115,12 @@ test-suite tests
   import: component
   build-depends:
     directory,
+    filepath,
     hedgehog,
     pretty-simple,
     sqlite-syntax,
+    tasty,
+    tasty-golden,
   hs-source-dirs: test
   main-is: Test.hs
   other-modules:
