@@ -4,6 +4,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Text (Text)
 import qualified Data.Text.Encoding as Text
+import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import Hedgehog
 import qualified LexerTests
@@ -11,15 +12,16 @@ import qualified ParserTests
 import qualified Sqlite.Syntax.Parser as Parser
 import System.Directory
 import System.Environment
+import System.Exit (exitFailure)
 import System.FilePath (replaceExtension)
 import Test.Tasty
 import Test.Tasty.Golden
-import Text.Pretty.Simple (pShowNoColor)
+import Text.Pretty.Simple (pPrint, pShowNoColor)
 import Prelude hiding (lex, readFile)
 
 main :: IO ()
 main = do
-  sqlFiles <- take 1 <$> listDirectory "test/files/in"
+  sqlFiles <- listDirectory "test/files/in"
   defaultMain do
     testGroup
       "parser"
@@ -36,10 +38,11 @@ main = do
                       case Parser.parseStatement sql of
                         Left err -> do
                           case err of
-                            Parser.SyntaxError {} -> Parser.renderParseError err
-                            Parser.ParseError {} -> Parser.renderParseError err
-                            Parser.AmbiguousParse x -> Text.Lazy.toStrict (pShowNoColor x)
-                        Right statement -> Text.Lazy.toStrict (pShowNoColor statement)
+                            Parser.SyntaxError {} -> Text.putStrLn (Parser.renderParseError err)
+                            Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
+                            Parser.AmbiguousParse x -> pPrint x
+                          exitFailure
+                        Right statement -> pure (Text.Lazy.toStrict (pShowNoColor statement))
                   ]
             ]
       ]
@@ -57,9 +60,12 @@ main = do
 --     putStrLn "Expected argument: 'lexer' or 'parser'"
 --     pure False
 
-golden :: TestName -> FilePath -> FilePath -> (Text -> Text) -> TestTree
+golden :: TestName -> FilePath -> FilePath -> (Text -> IO Text) -> TestTree
 golden name infile outfile f =
-  goldenVsString name outfile (ByteString.Lazy.fromStrict . Text.encodeUtf8 . f <$> readFile infile)
+  goldenVsString name outfile do
+    contents <- readFile infile
+    output <- f contents
+    pure (ByteString.Lazy.fromStrict (Text.encodeUtf8 output))
 
 andM :: Monad m => [m Bool] -> m Bool
 andM = \case
