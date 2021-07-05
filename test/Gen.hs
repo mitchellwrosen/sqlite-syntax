@@ -26,8 +26,7 @@ genExpression :: Gen Expression
 genExpression =
   Gen.recursive
     Gen.choice
-    [ Expression'Column <$>
-       genNamespaced (Identity <$> genNamespaced genIdentifier genIdentifier) (Identity <$> genIdentifier),
+    [ Expression'Column <$> genNamespaced (genNamespaced genIdentifier genIdentifier) (genIdentifier),
       Expression'LiteralValue <$> genLiteralValue,
       Expression'Parameter <$> genParameter,
       Expression'Raise <$> genRaise
