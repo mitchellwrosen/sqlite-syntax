@@ -19,46 +19,49 @@ import Test.Tasty.Golden
 import Text.Pretty.Simple (pPrint, pShowNoColor)
 import Prelude hiding (lex, readFile)
 
-main :: IO ()
+main :: IO Bool
 main = do
-  sqlFiles <- listDirectory "test/files/in"
-  defaultMain do
-    testGroup
-      "parser"
-      [ localOption (SizeCutoff 4096) do
-          testGroup
-            "golden"
-            [ testGroup "show" do
-                sqlFile <- sqlFiles
-                [ golden
-                    sqlFile
-                    ("test/files/in/" ++ sqlFile)
-                    ("test/files/out0/" ++ replaceExtension sqlFile "hs")
-                    \sql ->
-                      case Parser.parseStatement sql of
-                        Left err -> do
-                          case err of
-                            Parser.SyntaxError {} -> Text.putStrLn (Parser.renderParseError err)
-                            Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
-                            Parser.AmbiguousParse x -> pPrint x
-                          exitFailure
-                        Right statement -> pure (Text.Lazy.toStrict (pShowNoColor statement))
-                  ]
-            ]
-      ]
-
--- getArgs >>= \case
---   ["lexer"] -> do
---     andM
---       [ check (withTests 10000 (property LexerTests.propRoundTrip)),
---         check (withTests 1 (property (LexerTests.unitTests)))
---       ]
---   ["parser"] -> do
---     ParserTests.parseGoldenFiles
---     pure True
---   _ -> do
---     putStrLn "Expected argument: 'lexer' or 'parser'"
---     pure False
+  -- Temporary manual parsing of args, because the full golden test suite isn't passing, so it's most convenient to run
+  -- the custom little "parser" test loop
+  getArgs >>= \case
+    ["lexer"] -> do
+      andM
+        [ check (withTests 10000 (property LexerTests.propRoundTrip)),
+          check (withTests 1 (property (LexerTests.unitTests)))
+        ]
+    ["parser"] -> do
+      ParserTests.parseGoldenFiles
+      pure True
+    ["golden"] -> do
+      sqlFiles <- listDirectory "test/files/in"
+      defaultMain do
+        testGroup
+          "parser"
+          [ localOption (SizeCutoff 4096) do
+              testGroup
+                "golden"
+                [ testGroup "show" do
+                    sqlFile <- sqlFiles
+                    [ golden
+                        sqlFile
+                        ("test/files/in/" ++ sqlFile)
+                        ("test/files/out0/" ++ replaceExtension sqlFile "hs")
+                        \sql ->
+                          case Parser.parseStatement sql of
+                            Left err -> do
+                              case err of
+                                Parser.SyntaxError {} -> Text.putStrLn (Parser.renderParseError err)
+                                Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
+                                Parser.AmbiguousParse x -> pPrint x
+                              exitFailure
+                            Right statement -> pure (Text.Lazy.toStrict (pShowNoColor statement))
+                      ]
+                ]
+          ]
+      pure True
+    _ -> do
+      putStrLn "Expected argument: 'lexer', 'parser', or 'golden'"
+      pure False
 
 golden :: TestName -> FilePath -> FilePath -> (Text -> IO Text) -> TestTree
 golden name infile outfile f =

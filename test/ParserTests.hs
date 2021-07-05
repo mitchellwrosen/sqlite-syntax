@@ -15,13 +15,13 @@ import Prelude hiding (readFile)
 
 parseGoldenFiles :: IO ()
 parseGoldenFiles = do
-  files0 <- listDirectory "test/files"
+  files0 <- listDirectory "test/files/in"
   (`fix` files0) \loop -> \case
     [] -> pure ()
     file : files -> do
       putStrLn file
       putStrLn (replicate (length file) '-')
-      sql <- readFile ("test/files/" ++ file)
+      sql <- readFile ("test/files/in/" ++ file)
       Text.putStrLn sql
       Text.putStrLn "\n==>\n"
       case Parser.parseStatement sql of
