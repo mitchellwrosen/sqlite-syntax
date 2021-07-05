@@ -13,7 +13,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Prettyprinter hiding (list)
 import Sqlite.Syntax
-import Prelude hiding (Ordering)
+import Prelude hiding (Ordering, filter)
 
 hardlines :: [Doc a] -> Doc a
 hardlines =
@@ -66,51 +66,67 @@ instance Pretty DeleteStatement where
 instance Pretty Expression where
   pretty = \case
     Expression'AggregateDistinctFunctionCall {} -> undefined
-    Expression'And {} -> undefined
+    Expression'And x y -> binop "AND" x y
     Expression'Between {} -> undefined
-    Expression'BitwiseAnd {} -> undefined
-    Expression'BitwiseNegate {} -> undefined
-    Expression'BitwiseOr {} -> undefined
+    Expression'BitwiseAnd x y -> binop "&" x y
+    Expression'BitwiseNegate x -> unop "~" x
+    Expression'BitwiseOr x y -> binop "|" x y
     Expression'Case {} -> undefined
     Expression'Cast {} -> undefined
     Expression'Collate {} -> undefined
     Expression'Column x -> pretty x
-    Expression'Concatenate {} -> undefined
-    Expression'Divide {} -> undefined
+    Expression'Concatenate x y -> binop "||" x y
+    Expression'Divide x y -> binop "/" x y
     Expression'Equals x y -> binop "=" x y
-    Expression'Exists {} -> undefined
-    Expression'FunctionCall {} -> undefined
+    Expression'Exists x -> "EXISTS" <+> pretty x
+    Expression'FunctionCall x -> pretty x
     Expression'Glob {} -> undefined
-    Expression'GreaterThan {} -> undefined
-    Expression'GreaterThanOrEquals {} -> undefined
+    Expression'GreaterThan x y -> binop ">" x y
+    Expression'GreaterThanOrEquals x y -> binop ">=" x y
     Expression'InFunction {} -> undefined
     Expression'InSubquery {} -> undefined
     Expression'InTable {} -> undefined
-    Expression'InValues {} -> undefined
-    Expression'Is {} -> undefined
+    Expression'InValues x -> pretty x
+    Expression'Is x y -> binop "IS" x y
     Expression'LessThan x y -> binop "<" x y
-    Expression'LessThanOrEquals {} -> undefined
+    Expression'LessThanOrEquals x y -> binop "<=" x y
     Expression'Like {} -> undefined
     Expression'LiteralValue x -> pretty x
     Expression'Match {} -> undefined
-    Expression'Minus {} -> undefined
-    Expression'Modulo {} -> undefined
-    Expression'Multiply {} -> undefined
-    Expression'Negate {} -> undefined
-    Expression'Not {} -> undefined
-    Expression'NotEquals {} -> undefined
-    Expression'Or {} -> undefined
+    Expression'Minus x y -> binop "-" x y
+    Expression'Modulo x y -> binop "%" x y
+    Expression'Multiply x y -> binop "*" x y
+    Expression'Negate x -> unop "-" x
+    Expression'Not x -> unop "NOT" x
+    Expression'NotEquals x y -> binop "<>" x y
+    Expression'Or x y -> binop "OR" x y
     Expression'Parameter {} -> undefined
-    Expression'Plus {} -> undefined
+    Expression'Plus x y -> binop "+" x y
     Expression'Raise {} -> undefined
     Expression'Regexp {} -> undefined
     Expression'RowValue {} -> undefined
-    Expression'ShiftLeft {} -> undefined
-    Expression'ShiftRight {} -> undefined
-    Expression'Subquery {} -> undefined
+    Expression'ShiftLeft x y -> binop "<<" x y
+    Expression'ShiftRight x y -> binop ">>" x y
+    Expression'Subquery x -> parenthesized (pretty x)
     where
+      unop s x =
+        parenthesized (s <+> parenthesized (pretty x))
+
       binop s x y =
-        parenthesized (hsep [pretty x, s, pretty y])
+        parenthesized (hsep [parenthesized (pretty x), s, parenthesized (pretty y)])
+
+instance Pretty (FunctionArguments Expression) where
+  pretty = \case
+    FunctionArguments'Arguments expressions -> list (pretty <$> expressions)
+    FunctionArguments'Wildcard -> "*"
+
+instance Pretty (FunctionCall FunctionArguments) where
+  pretty FunctionCall {name, arguments} =
+    pretty name <> parenthesized (pretty arguments)
+
+instance Pretty FunctionCallExpression where
+  pretty FunctionCallExpression {call, filter, over} =
+    pretty call <> maybe mempty undefined filter <> maybe mempty undefined over
 
 instance Pretty GroupBy where
   pretty GroupBy {groupBy, having} =
@@ -141,6 +157,10 @@ instance Pretty InsertStatement where
               InsertSelect _ (Just _) -> undefined
           ]
       _ -> undefined
+
+instance Pretty InValuesExpression where
+  pretty InValuesExpression {expression, values} =
+    pretty expression <+> "IN" <+> parenthesized (list (pretty <$> values))
 
 instance Pretty JoinConstraint where
   pretty = \case
