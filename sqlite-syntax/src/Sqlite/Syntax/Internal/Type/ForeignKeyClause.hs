@@ -4,9 +4,9 @@ module Sqlite.Syntax.Internal.Type.ForeignKeyClause
   )
 where
 
-import Data.Functor.Identity (Identity)
+import Data.List.NonEmpty (NonEmpty)
+import Data.Text (Text)
 import GHC.Generics (Generic)
-import Sqlite.Syntax.Internal.Type.Columns (Columns)
 import Prelude
 
 -- | https://sqlite.org/syntax/foreign-key-clause.html
@@ -27,7 +27,8 @@ data Action
 --
 -- TODO rename?
 data ForeignKeyClause = ForeignKeyClause
-  { references :: Columns Identity [],
+  { table :: Text,
+    columns :: Maybe (NonEmpty Text),
     onDelete :: Action,
     onUpdate :: Action,
     deferred :: Bool

@@ -15,6 +15,8 @@ import Prelude hiding (Ordering)
 --   * /The PRIMARY KEY clause must contain only column names — the use of expressions in an indexed-column of a PRIMARY KEY is not supported./
 --
 --   * /As with PRIMARY KEYs, a UNIQUE table-constraint clause must contain only column names — the use of expressions in an indexed-column of a UNIQUE table-constraint is not supported./
+--
+-- TODO support expressions
 data IndexedColumn = IndexedColumn
   { column :: Text,
     collation :: Maybe Text,

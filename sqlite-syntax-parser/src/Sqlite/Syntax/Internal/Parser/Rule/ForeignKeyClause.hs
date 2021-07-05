@@ -5,8 +5,6 @@ where
 
 import Control.Applicative hiding (some)
 import Control.Applicative.Combinators (choice)
-import Data.Functor.Identity (Identity (..))
-import Sqlite.Syntax.Internal.Parser.Rule.Columns (columnsRule)
 import Sqlite.Syntax.Internal.Parser.Utils
 import Sqlite.Syntax.Internal.Type.ForeignKeyClause
 import qualified Sqlite.Syntax.Parser.Token as Token
@@ -16,8 +14,9 @@ import Prelude
 
 foreignKeyClauseRule :: forall r. Rule r ForeignKeyClause
 foreignKeyClauseRule =
-  (\references (onDelete, onUpdate) deferred -> ForeignKeyClause {references, onDelete, onUpdate, deferred})
-    <$> (Token.references *> columnsRule (fmap Identity))
+  (\table columns (onDelete, onUpdate) deferred -> ForeignKeyClause {table, columns, onDelete, onUpdate, deferred})
+    <$> (Token.references *> Token.identifier)
+    <*> optional (parens (commaSep1 Token.identifier))
     <*> (fromActions <$> many actionClauseRule)
     <*> deferredRule
   where

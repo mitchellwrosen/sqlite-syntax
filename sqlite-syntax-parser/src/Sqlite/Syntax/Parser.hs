@@ -22,9 +22,11 @@ import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRu
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
 import Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn (indexedColumnRule)
+import Sqlite.Syntax.Internal.Parser.Rule.InsertStatement (makeInsertStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
+import Sqlite.Syntax.Internal.Parser.Rule.ConflictResolution (makeConflictResolutionRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Select (makeSelectRule)
 import Sqlite.Syntax.Internal.Parser.Rule.SelectCore (makeSelectCoreRule)
@@ -154,7 +156,15 @@ syntaxParser = mdo
   valuesRule <- Earley.rule (makeValuesRule expressionRule)
   windowRule <- Earley.rule (makeWindowRule expressionRule orderingTermRule)
 
-  let columnDefinitionRule :: Rule r ColumnDefinition
+  let alterTableStatementRule :: Rule r AlterTableStatement
+      alterTableStatementRule =
+        makeAlterTableStatement columnDefinitionRule
+
+      attachStatementRule :: Rule r AttachStatement
+      attachStatementRule =
+        makeAttachStatementRule expressionRule
+
+      columnDefinitionRule :: Rule r ColumnDefinition
       columnDefinitionRule =
         makeColumnDefinitionRule expressionRule
 
@@ -170,6 +180,10 @@ syntaxParser = mdo
       deleteStatementRule =
         makeDeleteStatementRule commonTableExpressionsRule expressionRule returningRule
 
+      insertStatementRule :: Rule r InsertStatement
+      insertStatementRule =
+        makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule valuesRule
+
       returningRule :: Rule r Returning
       returningRule =
         makeReturningRule expressionRule
@@ -177,9 +191,9 @@ syntaxParser = mdo
       statementRule :: Rule r Statement
       statementRule =
         choice
-          [ Statement'AlterTable <$> makeAlterTableStatement columnDefinitionRule,
-            Statement'Analyze <$> analyzeStatement,
-            Statement'Attach <$> makeAttachStatement expressionRule,
+          [ Statement'AlterTable <$> alterTableStatementRule,
+            Statement'Analyze <$> analyzeStatementRule,
+            Statement'Attach <$> attachStatementRule,
             Statement'Begin
               <$> ( Token.begin
                       *> choice
@@ -201,7 +215,7 @@ syntaxParser = mdo
             -- Statement'DropTable <$> pure TODO,
             -- Statement'DropTrigger <$> pure TODO,
             -- Statement'DropView <$> pure TODO,
-            -- Statement'Insert <$> pure TODO,
+            Statement'Insert <$> insertStatementRule,
             -- Statement'Pragma <$> pure TODO,
             -- Statement'Reindex <$> pure TODO,
             -- Statement'Release <$> pure TODO,
@@ -319,12 +333,12 @@ makeAlterTableStatement columnDefinition =
           <*> (Token.to *> Token.identifier)
       ]
 
-analyzeStatement :: Rule r AnalyzeStatement
-analyzeStatement =
+analyzeStatementRule :: Rule r AnalyzeStatement
+analyzeStatementRule =
   AnalyzeStatement <$> (Token.analyze *> optional (namespacedRule Token.identifier Token.identifier))
 
-makeAttachStatement :: Rule r Expression -> Rule r AttachStatement
-makeAttachStatement expression =
+makeAttachStatementRule :: Rule r Expression -> Rule r AttachStatement
+makeAttachStatementRule expression =
   AttachStatement <$> (Token.attach *> optional Token.database *> expression) <*> (Token.as *> Token.identifier)
 
 makeColumnDefinitionRule :: forall r. Rule r Expression -> Rule r ColumnDefinition
@@ -462,10 +476,7 @@ makeExpressionRule selectStatement windowRule = mdo
                     <$> (Token.cast *> Token.leftParenthesis *> expression)
                     <*> (Token.as *> Token.identifier)
                 ),
-          Expression'Column
-            <$> namespacedRule
-              (Identity <$> namespacedRule Token.identifier Token.identifier)
-              (Identity <$> Token.identifier),
+          Expression'Column <$> namespacedRule (namespacedRule Token.identifier Token.identifier) Token.identifier,
           Expression'Exists <$> (Token.exists *> parens selectStatement),
           Expression'FunctionCall
             <$> ( FunctionCallExpression
@@ -633,20 +644,6 @@ makeExpressionRule selectStatement windowRule = mdo
         [ Parameter'Named <$> Token.namedParameter,
           Parameter'Ordinal <$> Token.parameter
         ]
-
-makeConflictResolutionRule :: Rule r a -> Rule r ConflictResolution
-makeConflictResolutionRule prefixRule =
-  choice
-    [ prefixRule
-        *> choice
-          [ Abort <$ Token.abort,
-            Fail <$ Token.fail,
-            Ignore <$ Token.ignore,
-            Replace <$ Token.replace,
-            Rollback <$ Token.rollback
-          ],
-      pure Abort
-    ]
 
 generatedType :: Rule r GeneratedType
 generatedType =

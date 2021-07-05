@@ -6,9 +6,9 @@ where
 import Control.Applicative (optional)
 import Sqlite.Syntax.Internal.Parser.Rule.QualifiedTableName (qualifiedTableNameRule)
 import Sqlite.Syntax.Internal.Parser.Utils
-import Sqlite.Syntax.Internal.Type.CommonTableExpressions
-import Sqlite.Syntax.Internal.Type.DeleteStatement
-import Sqlite.Syntax.Internal.Type.Expression
+import Sqlite.Syntax.Internal.Type.CommonTableExpressions (CommonTableExpressions)
+import Sqlite.Syntax.Internal.Type.DeleteStatement (DeleteStatement (..))
+import Sqlite.Syntax.Internal.Type.Expression (Expression)
 import Sqlite.Syntax.Internal.Type.Returning (Returning)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Prelude

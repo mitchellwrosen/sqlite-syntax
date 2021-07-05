@@ -9,6 +9,7 @@ import Data.Foldable (toList)
 import Data.Functor.Identity (Identity (..))
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (catMaybes)
+import Data.Text (Text)
 import Prettyprinter
 import Sqlite.Syntax
 import Prelude hiding (Ordering)
@@ -148,7 +149,7 @@ instance Pretty OrderingTerm where
       Nothing -> hsep [pretty expression, pretty ordering, pretty nullsPlacement]
       Just _ -> undefined
 
-instance (Pretty a, Pretty b) => Pretty (Namespaced a b) where
+instance Pretty a => Pretty (Namespaced a Text) where
   pretty (Namespaced x y) =
     maybe mempty ((<> dot) . pretty) x <> pretty y
 

@@ -68,9 +68,7 @@ data Limit = Limit
   }
   deriving stock (Eq, Generic, Show)
 
--- |
--- * https://sqlite.org/lang_select.html
--- * https://sqlite.org/syntax/result-column.html
+-- | https://sqlite.org/lang_select.html
 --
 -- @
 -- __expression__ [/AS/] __column__

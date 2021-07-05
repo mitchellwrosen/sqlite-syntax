@@ -299,6 +299,13 @@ distinct =
       LocatedToken DISTINCT _ -> Just ()
       _ -> Nothing
 
+do_ :: Terminal r ()
+do_ =
+  (<?> "DO") do
+    Earley.terminal \case
+      LocatedToken DO _ -> Just ()
+      _ -> Nothing
+
 drop :: Terminal r ()
 drop =
   (<?> "DROP") do
@@ -558,11 +565,25 @@ inner =
       LocatedToken INNER _ -> Just ()
       _ -> Nothing
 
+insert :: Terminal r ()
+insert =
+  (<?> "INSERT") do
+    Earley.terminal \case
+      LocatedToken INSERT _ -> Just ()
+      _ -> Nothing
+
 intersect :: Terminal r ()
 intersect =
   (<?> "INTERSECT") do
     Earley.terminal \case
       LocatedToken INTERSECT _ -> Just ()
+      _ -> Nothing
+
+into :: Terminal r ()
+into =
+  (<?> "INTO") do
+    Earley.terminal \case
+      LocatedToken INTO _ -> Just ()
       _ -> Nothing
 
 is :: Terminal r ()
@@ -696,6 +717,13 @@ not =
   (<?> "NOT") do
     Earley.terminal \case
       LocatedToken NOT _ -> Just ()
+      _ -> Nothing
+
+nothing :: Terminal r ()
+nothing =
+  (<?> "NOTHING") do
+    Earley.terminal \case
+      LocatedToken NOTHING _ -> Just ()
       _ -> Nothing
 
 notnull :: Terminal r ()

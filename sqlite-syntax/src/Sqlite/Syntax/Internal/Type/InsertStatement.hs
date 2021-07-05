@@ -13,10 +13,10 @@ import Data.List.NonEmpty
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Sqlite.Syntax.Internal.Type.Aliased (Aliased)
-import Sqlite.Syntax.Internal.Type.Columns (Columns)
 import Sqlite.Syntax.Internal.Type.CommonTableExpressions (CommonTableExpressions)
 import Sqlite.Syntax.Internal.Type.Expression (Expression)
 import Sqlite.Syntax.Internal.Type.IndexedColumn (IndexedColumn)
+import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Sqlite.Syntax.Internal.Type.OnConflict (ConflictResolution)
 import Sqlite.Syntax.Internal.Type.Returning (Returning)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
@@ -30,6 +30,7 @@ data ConflictTarget = ConflictTarget
   }
   deriving stock (Eq, Generic, Show)
 
+-- | https://sqlite.org/lang_insert.html
 data Insert
   = InsertDefaultValues
   | InsertSelect SelectStatement (Maybe UpsertClauses)
@@ -38,9 +39,10 @@ data Insert
 
 -- | https://sqlite.org/lang_insert.html
 data InsertStatement = InsertStatement
-  { commonTableExpressions :: CommonTableExpressions,
+  { commonTableExpressions :: Maybe CommonTableExpressions,
     onConflict :: ConflictResolution,
-    table :: Columns (Aliased Maybe) [],
+    table :: Aliased Maybe (Namespaced Text Text),
+    columns :: Maybe (NonEmpty Text),
     insert :: Insert,
     returning :: Maybe Returning
   }
@@ -53,8 +55,10 @@ data UpsertAction
   deriving stock (Eq, Generic, Show)
 
 -- | https://www.sqlite.org/syntax/upsert-clause.html
-data UpsertClause f
-  = UpsertClause (f ConflictTarget) UpsertAction
+data UpsertClause f = UpsertClause
+  { conflictTarget :: f ConflictTarget,
+    action :: UpsertAction
+  }
   deriving stock (Generic)
 
 deriving instance Eq (f ConflictTarget) => Eq (UpsertClause f)

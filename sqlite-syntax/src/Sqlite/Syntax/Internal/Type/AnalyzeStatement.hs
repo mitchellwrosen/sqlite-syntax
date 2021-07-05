@@ -9,6 +9,6 @@ import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Prelude
 
 -- | https://sqlite.org/lang_analyze.html
-data AnalyzeStatement
+newtype AnalyzeStatement
   = AnalyzeStatement (Maybe (Namespaced Text Text))
   deriving stock (Eq, Generic, Show)

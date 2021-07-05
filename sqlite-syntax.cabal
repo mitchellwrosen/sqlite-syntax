@@ -6,7 +6,7 @@ version: 0
 
 common component
   build-depends:
-    base,
+    base ^>= 4.15,
     bytestring,
     containers,
     Earley,
@@ -62,13 +62,14 @@ library
     sqlite-syntax-pretty/src
   other-modules:
     Sqlite.Syntax.Internal.Parser.Rule.Aliased
-    Sqlite.Syntax.Internal.Parser.Rule.Columns
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.CompoundSelect
+    Sqlite.Syntax.Internal.Parser.Rule.ConflictResolution
     Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement
     Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause
     Sqlite.Syntax.Internal.Parser.Rule.FunctionCall
     Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn
+    Sqlite.Syntax.Internal.Parser.Rule.InsertStatement
     Sqlite.Syntax.Internal.Parser.Rule.Namespaced
     Sqlite.Syntax.Internal.Parser.Rule.Ordering
     Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm
@@ -85,7 +86,6 @@ library
     Sqlite.Syntax.Internal.Type.AnalyzeStatement
     Sqlite.Syntax.Internal.Type.AttachStatement
     Sqlite.Syntax.Internal.Type.ColumnDefinition
-    Sqlite.Syntax.Internal.Type.Columns
     Sqlite.Syntax.Internal.Type.CommonTableExpressions
     Sqlite.Syntax.Internal.Type.CreateIndexStatement
     Sqlite.Syntax.Internal.Type.CreateTableStatement
