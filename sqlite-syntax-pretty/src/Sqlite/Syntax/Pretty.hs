@@ -10,22 +10,23 @@ import Data.Functor.Identity (Identity (..))
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
-import Prettyprinter
+import qualified Data.Text as Text
+import Prettyprinter hiding (list)
 import Sqlite.Syntax
 import Prelude hiding (Ordering)
-
-commaSep :: [Doc a] -> [Doc a]
-commaSep =
-  punctuate comma
-
-commaSepIndented :: [Doc a] -> Doc a
-commaSepIndented =
-  nest 2 . foldMap (softline <>) . commaSep
 
 hardlines :: [Doc a] -> Doc a
 hardlines =
   concatWith
     (\x y -> x <> hardline <> y)
+
+list :: [Doc a] -> Doc a
+list =
+  sep . punctuate comma
+
+list1 :: NonEmpty (Doc a) -> Doc a
+list1 =
+  list . toList
 
 parenthesized :: Doc a -> Doc a
 parenthesized x =
@@ -33,8 +34,8 @@ parenthesized x =
 
 --
 
-prettyMaybeAliased :: Pretty a => Aliased Maybe a -> Doc b
-prettyMaybeAliased = \case
+prettyAsAlias :: Pretty a => Aliased Maybe a -> Doc b
+prettyAsAlias = \case
   Aliased x Nothing -> pretty x
   Aliased x (Just y) -> hsep [pretty x, "AS", pretty y]
 
@@ -115,8 +116,31 @@ instance Pretty GroupBy where
   pretty GroupBy {groupBy, having} =
     group $
       "GROUP BY"
-        <> commaSepIndented (map pretty (toList groupBy))
+        <> nest 2 (softline <> list1 (pretty <$> groupBy))
         <> maybe mempty (\e -> line <> "HAVING" <+> pretty e) having
+
+instance Pretty InsertStatement where
+  pretty InsertStatement {commonTableExpressions, onConflict, table, columns, insert, returning} =
+    case (commonTableExpressions, returning) of
+      (Nothing, Nothing) ->
+        hardlines
+          [ mconcat
+              [ case onConflict of
+                  Abort -> "INSERT"
+                  Fail -> "INSERT OR FAIL"
+                  Ignore -> "INSERT OR IGNORE"
+                  Replace -> "REPLACE"
+                  Rollback -> "INSERT OR ROLLBACK",
+                " INTO ",
+                prettyAsAlias table,
+                maybe mempty (\cs -> space <> parenthesized (list1 (pretty <$> cs))) columns
+              ],
+            case insert of
+              InsertDefaultValues -> "DEFAULT VALUES"
+              InsertSelect select Nothing -> pretty select
+              InsertSelect _ (Just _) -> undefined
+          ]
+      _ -> undefined
 
 instance Pretty JoinConstraint where
   pretty = \case
@@ -136,7 +160,7 @@ instance Pretty LiteralValue where
     CurrentTimestamp -> "CURRENT_TIMESTAMP"
     Null -> "NULL"
     Number x -> pretty x
-    String _ -> undefined
+    String x -> pretty ("'" <> Text.replace "'" "''" x <> "'")
 
 instance Pretty Ordering where
   pretty = \case
@@ -156,7 +180,7 @@ instance Pretty a => Pretty (Namespaced a Text) where
 instance Pretty QualifiedTableName where
   pretty QualifiedTableName {name, indexedBy} =
     case indexedBy of
-      Nothing -> prettyMaybeAliased name
+      Nothing -> prettyAsAlias name
       Just _ -> undefined
 
 instance Pretty NullsPlacement where
@@ -166,7 +190,7 @@ instance Pretty NullsPlacement where
 
 instance Pretty ResultColumn where
   pretty = \case
-    ResultColumn'Expression x -> prettyMaybeAliased x
+    ResultColumn'Expression x -> prettyAsAlias x
     ResultColumn'Wildcard (Namespaced mx ()) -> maybe "*" (\x -> pretty x <> dot <> "*") mx
 
 instance Pretty Returning where
@@ -177,7 +201,7 @@ instance Pretty Select where
     hardlines
       ( ( "SELECT"
             <> (if distinct then space <> "DISTINCT" else mempty)
-            <> commaSepIndented (map pretty (toList columns))
+            <> nest 2 (softline <> list1 (pretty <$> columns))
         ) :
         catMaybes
           [ (("FROM" <+>) . pretty) <$> from,
@@ -189,14 +213,15 @@ instance Pretty Select where
     where
       prettyWindow :: NonEmpty (Aliased Identity Window) -> Doc a
       prettyWindow =
-        commaSepIndented
-          . map (\(Aliased x (Identity y)) -> hsep [pretty y, "AS", pretty x])
-          . toList
+        nest 2
+          . (softline <>)
+          . list1
+          . fmap (\(Aliased x (Identity y)) -> hsep [pretty y, "AS", pretty x])
 
 instance Pretty SelectCore where
   pretty = \case
     SelectCore'Select x -> pretty x
-    SelectCore'Values _ -> undefined
+    SelectCore'Values x -> pretty x
 
 instance Pretty SelectStatement where
   pretty SelectStatement {commonTableExpressions, select, orderBy, limit} =
@@ -205,7 +230,7 @@ instance Pretty SelectStatement where
         sep
           ( pretty select :
             catMaybes
-              [ (("ORDER BY" <>) . commaSepIndented . map pretty . toList) <$> orderBy,
+              [ (("ORDER BY" <>) . nest 2 . (softline <>) . list1 . fmap pretty) <$> orderBy,
                 pretty <$> limit
               ]
           )
@@ -230,7 +255,7 @@ instance Pretty Statement where
     Statement'DropTable {} -> undefined
     Statement'DropTrigger {} -> undefined
     Statement'DropView {} -> undefined
-    Statement'Insert {} -> undefined
+    Statement'Insert x -> pretty x
     Statement'Pragma {} -> undefined
     Statement'Reindex {} -> undefined
     Statement'Release {} -> undefined
@@ -279,6 +304,10 @@ instance Pretty TransactionType where
     Deferred -> "DEFERRED"
     Exclusive -> "EXCLUSIVE"
     Immediate -> "IMMEDIATE"
+
+instance Pretty Values where
+  pretty (Values xs) =
+    "VALUES" <> nest 2 (softline <> list1 (parenthesized . list1 . fmap pretty <$> xs))
 
 instance Pretty Window where
   pretty = undefined
