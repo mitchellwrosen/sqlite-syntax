@@ -18,6 +18,7 @@ import GHC.Generics (Generic)
 import Sqlite.Syntax
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
 import Sqlite.Syntax.Internal.Parser.Rule.CompoundSelect (makeCompoundSelectRule)
+import Sqlite.Syntax.Internal.Parser.Rule.ConflictResolution (makeConflictResolutionRule)
 import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
@@ -26,7 +27,6 @@ import Sqlite.Syntax.Internal.Parser.Rule.InsertStatement (makeInsertStatementRu
 import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
-import Sqlite.Syntax.Internal.Parser.Rule.ConflictResolution (makeConflictResolutionRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Select (makeSelectRule)
 import Sqlite.Syntax.Internal.Parser.Rule.SelectCore (makeSelectCoreRule)
@@ -474,7 +474,7 @@ makeExpressionRule selectStatement windowRule = mdo
           Expression'Cast
             <$> ( CastExpression
                     <$> (Token.cast *> Token.leftParenthesis *> expression)
-                    <*> (Token.as *> Token.identifier)
+                    <*> (Token.as *> Token.identifier <* Token.rightParenthesis)
                 ),
           Expression'Column <$> namespacedRule (namespacedRule Token.identifier Token.identifier) Token.identifier,
           Expression'Exists <$> (Token.exists *> parens selectStatement),
@@ -503,6 +503,7 @@ makeExpressionRule selectStatement windowRule = mdo
                     <$> (Token.leftParenthesis *> expression)
                     <*> (Token.comma *> expression)
                     <*> many (Token.comma *> expression)
+                    <* Token.rightParenthesis
                 ),
           Expression'Subquery <$> parens selectStatement,
           parens expression
