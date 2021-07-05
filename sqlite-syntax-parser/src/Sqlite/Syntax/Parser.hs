@@ -182,7 +182,7 @@ syntaxParser = mdo
 
       insertStatementRule :: Rule r InsertStatement
       insertStatementRule =
-        makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule valuesRule
+        makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule
 
       returningRule :: Rule r Returning
       returningRule =

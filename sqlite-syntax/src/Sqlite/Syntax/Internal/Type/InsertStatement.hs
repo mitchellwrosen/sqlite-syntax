@@ -20,7 +20,6 @@ import Sqlite.Syntax.Internal.Type.Namespaced (Namespaced)
 import Sqlite.Syntax.Internal.Type.OnConflict (ConflictResolution)
 import Sqlite.Syntax.Internal.Type.Returning (Returning)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
-import Sqlite.Syntax.Internal.Type.Values (Values)
 import Prelude
 
 -- | https://sqlite.org/lang_upsert.html
@@ -34,7 +33,6 @@ data ConflictTarget = ConflictTarget
 data Insert
   = InsertDefaultValues
   | InsertSelect SelectStatement (Maybe UpsertClauses)
-  | InsertValues Values (Maybe UpsertClauses)
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/lang_insert.html

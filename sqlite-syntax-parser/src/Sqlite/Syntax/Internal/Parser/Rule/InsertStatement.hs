@@ -20,7 +20,6 @@ import Sqlite.Syntax.Internal.Type.InsertStatement
 import Sqlite.Syntax.Internal.Type.OnConflict (ConflictResolution (..))
 import Sqlite.Syntax.Internal.Type.Returning (Returning)
 import Sqlite.Syntax.Internal.Type.SelectStatement (SelectStatement)
-import Sqlite.Syntax.Internal.Type.Values (Values)
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Prelude
 
@@ -31,9 +30,8 @@ makeInsertStatementRule ::
   Rule r Expression ->
   Rule r Returning ->
   Rule r SelectStatement ->
-  Rule r Values ->
   Rule r InsertStatement
-makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule valuesRule =
+makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule =
   InsertStatement
     <$> optional commonTableExpressionsRule
     <*> choice
@@ -54,8 +52,7 @@ makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule 
     insertRule =
       choice
         [ InsertDefaultValues <$ (Token.default_ *> Token.values),
-          InsertSelect <$> selectStatementRule <*> optional upsertClausesRule,
-          InsertValues <$> valuesRule <*> optional upsertClausesRule
+          InsertSelect <$> selectStatementRule <*> optional upsertClausesRule
         ]
 
     upsertClausesRule :: Rule r UpsertClauses
