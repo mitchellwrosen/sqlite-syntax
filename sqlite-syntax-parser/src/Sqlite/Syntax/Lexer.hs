@@ -22,6 +22,7 @@ import TextParser (TextParser)
 import qualified TextParser
 import Prelude hiding (exponent, lex)
 
+-- | Read SQL as a list of tokens.
 lex :: Text -> Either LexerError [LocatedToken]
 lex input =
   case TextParser.run (space >> manyTill locatedTokenP TextParser.eof) input of
@@ -30,11 +31,14 @@ lex input =
     Right tokens -> Right tokens
 
 data LexerError = LexerError
-  { input :: Text,
+  { -- | The input text.
+    input :: Text,
+    -- | The character offset into the input text that the error occurred.
     offset :: Int
   }
   deriving stock (Eq, Generic, Show)
 
+-- | Render a lexer error as text.
 renderLexerError :: LexerError -> Text
 renderLexerError LexerError {input, offset} =
   renderError "Lexer error" input (Just offset)

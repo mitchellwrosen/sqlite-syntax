@@ -13,8 +13,10 @@ import GHC.Generics (Generic)
 import Numeric.Natural
 import Prelude
 
-data LocatedToken
-  = LocatedToken Token Int
+data LocatedToken = LocatedToken
+  { token :: Token,
+    offset :: Int
+  }
   deriving stock (Eq, Generic, Show)
 
 {- ORMOLU_DISABLE -}

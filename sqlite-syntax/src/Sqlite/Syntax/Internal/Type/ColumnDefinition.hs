@@ -18,13 +18,19 @@ import Sqlite.Syntax.Internal.Type.OnConflict (ConflictResolution)
 import Sqlite.Syntax.Internal.Type.Ordering (Ordering)
 import Prelude hiding (Ordering)
 
+-- | https://sqlite.org/syntax/column-constraint.html
 data ColumnConstraint
-  = ColumnConstraint'Check Expression
-  | ColumnConstraint'Collate Text
-  | ColumnConstraint'Default Default
+  = -- | /CHECK (∙)/
+    ColumnConstraint'Check Expression
+  | -- | /COLLATE ∙/
+    ColumnConstraint'Collate Text
+  | -- | /DEFAULT ∙/
+    ColumnConstraint'Default Default
   | ColumnConstraint'ForeignKey ForeignKeyClause
-  | ColumnConstraint'Generated Expression (Maybe GeneratedType)
-  | ColumnConstraint'NotNull ConflictResolution
+  | -- | /GENERATED ALWAYS AS (∙) ∙/
+    ColumnConstraint'Generated Expression GeneratedType
+  | -- | /NOT NULL ∙/
+    ColumnConstraint'NotNull ConflictResolution
   | ColumnConstraint'PrimaryKey Ordering ConflictResolution Bool
   | ColumnConstraint'Unique ConflictResolution
   deriving stock (Eq, Generic, Show)
@@ -37,23 +43,32 @@ data ColumnDefinition = ColumnDefinition
   }
   deriving stock (Eq, Generic, Show)
 
+-- | /DEFAULT ∙/
 data Default
-  = Default'Expression Expression
-  | Default'LiteralValue LiteralValue
-  | Default'SignedNumber SignedNumber
+  = -- | /DEFAULT (∙)/
+    Default'Expression Expression
+  | -- | /DEFAULT ∙/
+    Default'LiteralValue LiteralValue
+  | -- | /DEFAULT ∙/
+    Default'SignedNumber SignedNumber
   deriving stock (Eq, Generic, Show)
 
 data GeneratedType
-  = Stored
-  | Virtual
+  = -- | /STORED/
+    Stored
+  | -- | /VIRTUAL/
+    Virtual
   deriving stock (Eq, Generic, Show)
 
 data Sign
-  = Sign'HyphenMinus
-  | Sign'PlusSign
+  = -- | /-/
+    Sign'HyphenMinus
+  | -- | /+/
+    Sign'PlusSign
   deriving stock (Eq, Generic, Show)
 
 -- | https://sqlite.org/syntax/signed-number.html
 data SignedNumber
-  = SignedNumber (Maybe Sign) Text
+  = SignedNumber Sign Text
+  | UnsignedNumber Text
   deriving stock (Eq, Generic, Show)

@@ -15,16 +15,21 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import GHC.Generics (Generic)
 import Sqlite.Syntax
+import Sqlite.Syntax.Internal.Parser.Rule.AlterTableStatement (makeAlterTableStatementRule)
+import Sqlite.Syntax.Internal.Parser.Rule.AnalyzeStatement (analyzeStatementRule)
+import Sqlite.Syntax.Internal.Parser.Rule.AttachStatement (makeAttachStatementRule)
+import Sqlite.Syntax.Internal.Parser.Rule.ColumnDefinition (makeColumnDefinitionRule)
 import Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression (makeCommonTableExpressionsRule)
 import Sqlite.Syntax.Internal.Parser.Rule.CompoundSelect (makeCompoundSelectRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ConflictResolution (makeConflictResolutionRule)
+import Sqlite.Syntax.Internal.Parser.Rule.CreateIndexStatement (makeCreateIndexStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement (makeDeleteStatementRule)
 import Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause (foreignKeyClauseRule)
 import Sqlite.Syntax.Internal.Parser.Rule.FunctionCall (functionCallRule)
 import Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn (indexedColumnRule)
 import Sqlite.Syntax.Internal.Parser.Rule.InsertStatement (makeInsertStatementRule)
+import Sqlite.Syntax.Internal.Parser.Rule.LiteralValue (literalValueRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Namespaced (namespacedRule)
-import Sqlite.Syntax.Internal.Parser.Rule.Ordering (orderingRule)
 import Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm (makeOrderingTermRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Returning (makeReturningRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Select (makeSelectRule)
@@ -145,87 +150,46 @@ data Syntax r = Syntax
 
 syntaxParser :: forall r. Earley.Grammar r (Syntax r)
 syntaxParser = mdo
+  columnDefinitionRule <- Earley.rule (makeColumnDefinitionRule expressionRule)
   commonTableExpressionsRule <- Earley.rule (makeCommonTableExpressionsRule selectStatementRule)
   compoundSelectRule <- Earley.rule (makeCompoundSelectRule compoundSelectRule selectCoreRule)
   expressionRule <- makeExpressionRule selectStatementRule windowRule
   orderingTermRule <- Earley.rule (makeOrderingTermRule expressionRule)
+  returningRule <- Earley.rule (makeReturningRule expressionRule)
   selectRule <- Earley.rule (makeSelectRule expressionRule tableRule windowRule)
   selectCoreRule <- Earley.rule (makeSelectCoreRule selectRule valuesRule)
   selectStatementRule <-
-    Earley.rule do
-      makeSelectStatementRule commonTableExpressionsRule compoundSelectRule expressionRule orderingTermRule
+    Earley.rule (makeSelectStatementRule commonTableExpressionsRule compoundSelectRule expressionRule orderingTermRule)
   tableRule <- makeTableRule expressionRule selectStatementRule
   valuesRule <- Earley.rule (makeValuesRule expressionRule)
   windowRule <- Earley.rule (makeWindowRule expressionRule orderingTermRule)
 
-  let alterTableStatementRule :: Rule r AlterTableStatement
-      alterTableStatementRule =
-        makeAlterTableStatement columnDefinitionRule
-
-      attachStatementRule :: Rule r AttachStatement
-      attachStatementRule =
-        makeAttachStatementRule expressionRule
-
-      columnDefinitionRule :: Rule r ColumnDefinition
-      columnDefinitionRule =
-        makeColumnDefinitionRule expressionRule
-
-      createIndexStatement :: Rule r CreateIndexStatement
-      createIndexStatement =
-        makeCreateIndexStatement expressionRule
-
-      createTableStatement :: Rule r CreateTableStatement
-      createTableStatement =
-        makeCreateTableStatement columnDefinitionRule expressionRule selectStatementRule
-
-      deleteStatementRule :: Rule r DeleteStatement
-      deleteStatementRule =
-        makeDeleteStatementRule commonTableExpressionsRule expressionRule returningRule
-
-      insertStatementRule :: Rule r InsertStatement
-      insertStatementRule =
-        makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule
-
-      returningRule :: Rule r Returning
-      returningRule =
-        makeReturningRule expressionRule
-
-      statementRule :: Rule r Statement
+  let statementRule :: Rule r Statement
       statementRule =
         choice
-          [ Statement'AlterTable <$> alterTableStatementRule,
+          [ Statement'AlterTable <$> makeAlterTableStatementRule columnDefinitionRule,
             Statement'Analyze <$> analyzeStatementRule,
-            Statement'Attach <$> attachStatementRule,
-            Statement'Begin
-              <$> ( Token.begin
-                      *> choice
-                        [ Exclusive <$ Token.exclusive,
-                          Immediate <$ Token.immediate,
-                          Deferred <$ perhaps_ Token.deferred
-                        ]
-                      <* optional Token.transaction
-                  ),
-            Statement'Commit <$ (choice [Token.commit, Token.end] *> optional Token.transaction),
-            Statement'CreateIndex <$> createIndexStatement,
-            Statement'CreateTable <$> createTableStatement,
+            Statement'Attach <$> makeAttachStatementRule expressionRule,
+            Statement'Begin <$> beginStatementRule,
+            Statement'Commit <$ commitStatementRule,
+            Statement'CreateIndex <$> makeCreateIndexStatementRule expressionRule,
+            Statement'CreateTable
+              <$> makeCreateTableStatementRule columnDefinitionRule expressionRule selectStatementRule,
             -- Statement'CreateTrigger <$> pure TODO,
             -- Statement'CreateView <$> pure TODO,
             -- Statement'CreateVirtualTable <$> pure TODO,
-            Statement'Delete <$> deleteStatementRule,
+            Statement'Delete <$> makeDeleteStatementRule commonTableExpressionsRule expressionRule returningRule,
             -- Statement'Detach <$> pure TODO,
             -- Statement'DropIndex <$> pure TODO,
             -- Statement'DropTable <$> pure TODO,
             -- Statement'DropTrigger <$> pure TODO,
             -- Statement'DropView <$> pure TODO,
-            Statement'Insert <$> insertStatementRule,
+            Statement'Insert
+              <$> makeInsertStatementRule commonTableExpressionsRule expressionRule returningRule selectStatementRule,
             -- Statement'Pragma <$> pure TODO,
             -- Statement'Reindex <$> pure TODO,
             -- Statement'Release <$> pure TODO,
-            Statement'Rollback
-              <$> ( Token.rollback
-                      *> optional Token.transaction
-                      *> optional (Token.to *> optional Token.savepoint *> Token.identifier)
-                  ),
+            Statement'Rollback <$> rollbackStatementRule,
             -- Statement'Savepoint <$> pure TODO,
             Statement'Select <$> selectStatementRule
             -- Statement'Update <$> pure TODO,
@@ -238,87 +202,6 @@ syntaxParser = mdo
       { synExpression = expressionRule,
         synStatement = statementRule
       }
-  where
-    makeWindowRule :: Rule r Expression -> Rule r OrderingTerm -> Rule r Window
-    makeWindowRule expressionRule orderingTermRule =
-      parens do
-        Window
-          <$> optional Token.identifier
-          <*> optional (Token.partition *> Token.by *> commaSep1 expressionRule)
-          <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
-          <*> choice [frameRule, pure defaultFrame]
-      where
-        defaultFrame :: Frame
-        defaultFrame =
-          Frame Range (Preceding Nothing) CurrentRow ExcludeNoOthers
-
-        frameRule :: Rule r Frame
-        frameRule =
-          ( \type_ (startingBoundary, endingBoundary) exclude ->
-              Frame {type_, startingBoundary, endingBoundary, exclude}
-          )
-            <$> choice
-              [ Groups <$ Token.groups,
-                Range <$ Token.range,
-                Rows <$ Token.rows
-              ]
-            <*> frameBoundariesRule
-            <*> frameExcludeRule
-          where
-            frameBoundariesRule :: Rule r (FrameBoundary Identity Maybe, FrameBoundary Maybe Identity)
-            frameBoundariesRule =
-              choice
-                [ (,)
-                    <$> ( Token.between
-                            *> choice
-                              [ currentRowRule,
-                                exprFollowingRule Identity,
-                                unboundedPrecedingRule,
-                                exprPrecedingRule Just
-                              ]
-                        )
-                    <*> ( Token.and
-                            *> choice
-                              [ currentRowRule,
-                                exprFollowingRule Just,
-                                unboundedFollowingRule,
-                                exprPrecedingRule Identity
-                              ]
-                        ),
-                  (,CurrentRow) <$> currentRowRule,
-                  (,CurrentRow) <$> unboundedPrecedingRule,
-                  (,CurrentRow) <$> exprPrecedingRule Just
-                ]
-              where
-                currentRowRule :: Rule r (FrameBoundary f g)
-                currentRowRule =
-                  CurrentRow <$ (Token.current *> Token.row)
-
-                exprFollowingRule :: (Expression -> f Expression) -> Rule r (FrameBoundary f g)
-                exprFollowingRule f =
-                  (Following . f) <$> (expressionRule <* Token.following)
-
-                exprPrecedingRule :: (Expression -> g Expression) -> Rule r (FrameBoundary f g)
-                exprPrecedingRule f =
-                  (Preceding . f) <$> (expressionRule <* Token.preceding)
-
-                unboundedFollowingRule :: Rule r (FrameBoundary Maybe g)
-                unboundedFollowingRule =
-                  Following Nothing <$ (Token.unbounded *> Token.following)
-
-                unboundedPrecedingRule :: Rule r (FrameBoundary f Maybe)
-                unboundedPrecedingRule =
-                  Preceding Nothing <$ (Token.unbounded *> Token.preceding)
-
-            frameExcludeRule :: Rule r FrameExclude
-            frameExcludeRule =
-              choice
-                [ ExcludeCurrentRow <$ (Token.exclude *> Token.current *> Token.row),
-                  ExcludeGroup <$ (Token.exclude *> Token.group),
-                  ExcludeNoOthers <$ (Token.exclude *> Token.no *> Token.others),
-                  ExcludeTies <$ (Token.exclude *> Token.ties),
-                  pure ExcludeNoOthers
-                ]
 
 expressionParser :: Earley.Grammar r (Rule r Expression)
 expressionParser =
@@ -330,84 +213,27 @@ statementParser =
 
 --
 
-makeAlterTableStatement :: Rule r ColumnDefinition -> Rule r AlterTableStatement
-makeAlterTableStatement columnDefinition =
-  AlterTableStatement
-    <$> (Token.alter *> Token.table *> namespacedRule Token.identifier Token.identifier)
-    <*> choice
-      [ TableAlteration'AddColumn <$> columnDefinition,
-        TableAlteration'DropColumn <$> Token.identifier,
-        TableAlteration'Rename <$> (Token.rename *> Token.to *> Token.identifier),
-        TableAlteration'RenameColumn
-          <$> (Token.rename *> optional Token.column *> Token.identifier)
-          <*> (Token.to *> Token.identifier)
+beginStatementRule :: Rule r TransactionType
+beginStatementRule =
+  Token.begin
+    *> choice
+      [ Exclusive <$ Token.exclusive,
+        Immediate <$ Token.immediate,
+        Deferred <$ perhaps_ Token.deferred
       ]
+    <* optional Token.transaction
 
-analyzeStatementRule :: Rule r AnalyzeStatement
-analyzeStatementRule =
-  AnalyzeStatement <$> (Token.analyze *> optional (namespacedRule Token.identifier Token.identifier))
+commitStatementRule :: Rule r (Maybe ())
+commitStatementRule =
+  choice [Token.commit, Token.end] *> optional Token.transaction
 
-makeAttachStatementRule :: Rule r Expression -> Rule r AttachStatement
-makeAttachStatementRule expression =
-  AttachStatement <$> (Token.attach *> optional Token.database *> expression) <*> (Token.as *> Token.identifier)
-
-makeColumnDefinitionRule :: forall r. Rule r Expression -> Rule r ColumnDefinition
-makeColumnDefinitionRule expressionRule =
-  ColumnDefinition
-    <$> Token.identifier
-    <*> optional Token.identifier
-    <*> many namedColumnConstraintRule
-  where
-    namedColumnConstraintRule :: Rule r (Named ColumnConstraint)
-    namedColumnConstraintRule =
-      Named
-        <$> optional (Token.constraint *> Token.identifier)
-        <*> columnConstraintRule
-      where
-        columnConstraintRule :: Rule r ColumnConstraint
-        columnConstraintRule =
-          choice
-            [ ColumnConstraint'Check <$> (Token.check *> parens expressionRule),
-              ColumnConstraint'Collate <$> (Token.collate *> Token.identifier),
-              ColumnConstraint'Default
-                <$> choice
-                  [ Default'Expression <$> parens expressionRule,
-                    Default'LiteralValue <$> literalValueRule,
-                    Default'SignedNumber <$> signedNumber
-                  ],
-              ColumnConstraint'ForeignKey <$> foreignKeyClauseRule,
-              ColumnConstraint'Generated
-                <$> (optional (Token.generated *> Token.always) *> Token.as *> parens expressionRule)
-                <*> optional generatedType,
-              ColumnConstraint'NotNull <$> (Token.not *> Token.null *> onConflictRule),
-              ColumnConstraint'PrimaryKey
-                <$> (Token.primary *> Token.key *> orderingRule)
-                <*> onConflictRule
-                <*> perhaps Token.autoincrement,
-              ColumnConstraint'Unique <$> (Token.unique *> onConflictRule)
-            ]
-          where
-            onConflictRule :: Rule r ConflictResolution
-            onConflictRule =
-              makeConflictResolutionRule (Token.on *> Token.conflict)
-
-makeCreateIndexStatement :: Rule r Expression -> Rule r CreateIndexStatement
-makeCreateIndexStatement expression =
-  CreateIndexStatement
-    <$> (Token.create *> perhaps Token.unique)
-    <*> (Token.index *> perhaps (Token.if_ *> Token.not *> Token.exists))
-    <*> namespacedRule Token.identifier Token.identifier
-    <*> (Token.on *> Token.identifier)
-    <*> parens (commaSep1 indexedColumnRule)
-    <*> optional (Token.where_ *> expression)
-
-makeCreateTableStatement ::
+makeCreateTableStatementRule ::
   forall r.
   Rule r ColumnDefinition ->
   Rule r Expression ->
   Rule r SelectStatement ->
   Rule r CreateTableStatement
-makeCreateTableStatement columnDefinition expression selectStatement =
+makeCreateTableStatementRule columnDefinition expression selectStatement =
   CreateTableStatement
     <$> (Token.create *> perhaps (choice [Token.temp, Token.temporary]))
     <*> (Token.table *> perhaps (Token.if_ *> Token.not *> Token.exists))
@@ -656,27 +482,6 @@ makeExpressionRule selectStatement windowRule = mdo
           Parameter'Ordinal <$> Token.parameter
         ]
 
-generatedType :: Rule r GeneratedType
-generatedType =
-  choice
-    [ Stored <$ Token.stored,
-      Virtual <$ Token.virtual
-    ]
-
-literalValueRule :: Rule r LiteralValue
-literalValueRule =
-  choice
-    [ Blob <$> Token.blob,
-      Boolean False <$ Token.false,
-      Boolean True <$ Token.true,
-      CurrentDate <$ Token.currentDate,
-      CurrentTime <$ Token.currentTime,
-      CurrentTimestamp <$ Token.currentTimestamp,
-      Null <$ Token.null,
-      Number <$> Token.number,
-      String <$> Token.string
-    ]
-
 raiseRule :: Rule r Raise
 raiseRule =
   Token.raise *> parens (choice xs)
@@ -689,6 +494,93 @@ raiseRule =
       ]
     errorMessage p =
       p *> Token.comma *> Token.string
+
+rollbackStatementRule :: Rule r (Maybe Text)
+rollbackStatementRule =
+  Token.rollback
+    *> optional Token.transaction
+    *> optional (Token.to *> optional Token.savepoint *> Token.identifier)
+
+makeWindowRule :: forall r. Rule r Expression -> Rule r OrderingTerm -> Rule r Window
+makeWindowRule expressionRule orderingTermRule =
+  parens do
+    Window
+      <$> optional Token.identifier
+      <*> optional (Token.partition *> Token.by *> commaSep1 expressionRule)
+      <*> optional (Token.order *> Token.by *> commaSep1 orderingTermRule)
+      <*> choice [frameRule, pure defaultFrame]
+  where
+    defaultFrame :: Frame
+    defaultFrame =
+      Frame Range (Preceding Nothing) CurrentRow ExcludeNoOthers
+
+    frameRule :: Rule r Frame
+    frameRule =
+      ( \type_ (startingBoundary, endingBoundary) exclude ->
+          Frame {type_, startingBoundary, endingBoundary, exclude}
+      )
+        <$> choice
+          [ Groups <$ Token.groups,
+            Range <$ Token.range,
+            Rows <$ Token.rows
+          ]
+        <*> frameBoundariesRule
+        <*> frameExcludeRule
+      where
+        frameBoundariesRule :: Rule r (FrameBoundary Identity Maybe, FrameBoundary Maybe Identity)
+        frameBoundariesRule =
+          choice
+            [ (,)
+                <$> ( Token.between
+                        *> choice
+                          [ currentRowRule,
+                            exprFollowingRule Identity,
+                            unboundedPrecedingRule,
+                            exprPrecedingRule Just
+                          ]
+                    )
+                <*> ( Token.and
+                        *> choice
+                          [ currentRowRule,
+                            exprFollowingRule Just,
+                            unboundedFollowingRule,
+                            exprPrecedingRule Identity
+                          ]
+                    ),
+              (,CurrentRow) <$> currentRowRule,
+              (,CurrentRow) <$> unboundedPrecedingRule,
+              (,CurrentRow) <$> exprPrecedingRule Just
+            ]
+          where
+            currentRowRule :: Rule r (FrameBoundary f g)
+            currentRowRule =
+              CurrentRow <$ (Token.current *> Token.row)
+
+            exprFollowingRule :: (Expression -> f Expression) -> Rule r (FrameBoundary f g)
+            exprFollowingRule f =
+              (Following . f) <$> (expressionRule <* Token.following)
+
+            exprPrecedingRule :: (Expression -> g Expression) -> Rule r (FrameBoundary f g)
+            exprPrecedingRule f =
+              (Preceding . f) <$> (expressionRule <* Token.preceding)
+
+            unboundedFollowingRule :: Rule r (FrameBoundary Maybe g)
+            unboundedFollowingRule =
+              Following Nothing <$ (Token.unbounded *> Token.following)
+
+            unboundedPrecedingRule :: Rule r (FrameBoundary f Maybe)
+            unboundedPrecedingRule =
+              Preceding Nothing <$ (Token.unbounded *> Token.preceding)
+
+        frameExcludeRule :: Rule r FrameExclude
+        frameExcludeRule =
+          choice
+            [ ExcludeCurrentRow <$ (Token.exclude *> Token.current *> Token.row),
+              ExcludeGroup <$ (Token.exclude *> Token.group),
+              ExcludeNoOthers <$ (Token.exclude *> Token.no *> Token.others),
+              ExcludeTies <$ (Token.exclude *> Token.ties),
+              pure ExcludeNoOthers
+            ]
 
 -- | https://sqlite.org/syntax/returning-clause.html
 newtype ReturningClause
@@ -705,16 +597,3 @@ data ReturningClauseItem
 
 makeReturningClauseItem :: Rule r Expression -> Rule r ReturningClauseItem
 makeReturningClauseItem = undefined
-
-signRule :: Rule r Sign
-signRule =
-  choice
-    [ Sign'HyphenMinus <$ Token.hyphenMinus,
-      Sign'PlusSign <$ Token.plusSign
-    ]
-
-signedNumber :: Rule r SignedNumber
-signedNumber =
-  SignedNumber
-    <$> optional signRule
-    <*> Token.number

@@ -63,14 +63,20 @@ library
   other-modules:
     Sqlite.Syntax.Internal.Error
     Sqlite.Syntax.Internal.Parser.Rule.Aliased
+    Sqlite.Syntax.Internal.Parser.Rule.AlterTableStatement
+    Sqlite.Syntax.Internal.Parser.Rule.AnalyzeStatement
+    Sqlite.Syntax.Internal.Parser.Rule.AttachStatement
+    Sqlite.Syntax.Internal.Parser.Rule.ColumnDefinition
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.CompoundSelect
     Sqlite.Syntax.Internal.Parser.Rule.ConflictResolution
+    Sqlite.Syntax.Internal.Parser.Rule.CreateIndexStatement
     Sqlite.Syntax.Internal.Parser.Rule.DeleteStatement
     Sqlite.Syntax.Internal.Parser.Rule.ForeignKeyClause
     Sqlite.Syntax.Internal.Parser.Rule.FunctionCall
     Sqlite.Syntax.Internal.Parser.Rule.IndexedColumn
     Sqlite.Syntax.Internal.Parser.Rule.InsertStatement
+    Sqlite.Syntax.Internal.Parser.Rule.LiteralValue
     Sqlite.Syntax.Internal.Parser.Rule.Namespaced
     Sqlite.Syntax.Internal.Parser.Rule.Ordering
     Sqlite.Syntax.Internal.Parser.Rule.OrderingTerm
