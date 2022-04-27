@@ -9,7 +9,8 @@ import Prelude
 
 -- TODO rename to Literal
 data LiteralValue
-  = Blob Text
+  = -- | /BLOB literals are string literals containing hexadecimal data and preceded by a single "x" or "X" character. Example: X'53514C697465'/
+    Blob Text
   | Boolean Bool
   | -- | /CURRENT_DATE/
     CurrentDate
@@ -19,6 +20,7 @@ data LiteralValue
     CurrentTimestamp
   | -- | /NULL/
     Null
-  | Number Text
+  | -- | https://sqlite.org/syntax/numeric-literal.html
+    Number Text
   | String Text
   deriving stock (Eq, Generic, Show)

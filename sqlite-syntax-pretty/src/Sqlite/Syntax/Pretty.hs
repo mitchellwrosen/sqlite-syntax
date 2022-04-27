@@ -1,3 +1,4 @@
+-- TODO no instances, just functions
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Sqlite.Syntax.Pretty
@@ -11,7 +12,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Prettyprinter hiding (list)
+import Prettyprinter hiding (column, list)
+import qualified Prettyprinter.Internal as Prettyprinter
 import Sqlite.Syntax
 import Prelude hiding (Ordering, filter)
 
@@ -24,10 +26,26 @@ list :: [Doc a] -> Doc a
 list =
   sep . punctuate comma
 
-list1 :: NonEmpty (Doc a) -> Doc a
-list1 =
-  list . NonEmpty.toList
+list1 :: (a -> Doc b) -> NonEmpty a -> Doc b
+list1 f =
+  list . map f . NonEmpty.toList
 
+-- The document
+--
+--     "yo " <> parenthesized ("bar" <> line <> "baz")
+--
+-- would look like
+--
+--     yo (bar baz)
+--
+-- when grouped, and
+--
+--     yo (
+--       bar
+--       baz
+--     )
+--
+-- otherwise.
 parenthesized :: Doc a -> Doc a
 parenthesized x =
   lparen <> nest 2 (softline' <> x) <> softline' <> rparen
@@ -37,9 +55,74 @@ parenthesized x =
 prettyAsAlias :: Pretty a => Aliased Maybe a -> Doc b
 prettyAsAlias = \case
   Aliased x Nothing -> pretty x
-  Aliased x (Just y) -> hsep [pretty x, "AS", pretty y]
+  Aliased x (Just y) -> pretty x <> " AS " <> pretty y
 
 --
+
+-- https://sqlite.org/syntax/column-constraint.html
+prettyColumnConstraint :: Named ColumnConstraint -> Doc a
+prettyColumnConstraint = undefined
+
+-- https://sqlite.org/syntax/conflict-clause.html
+prettyConflictResolution :: ConflictResolution -> Doc a
+prettyConflictResolution = \case
+  Abort -> mempty
+  Fail -> "ON CONFLICT FAIL"
+  Ignore -> "ON CONFLICT IGNORE"
+  Replace -> "ON CONFLICT REPLACE"
+  Rollback -> "ON CONFLICT ROLLBACK"
+
+-- https://sqlite.org/syntax/create-index-stmt.html
+prettyCreateIndexStatement :: CreateIndexStatement -> Doc a
+prettyCreateIndexStatement CreateIndexStatement {unique, ifNotExists, name, table, columns, where_} =
+  "CREATE "
+    <> (if unique then "UNIQUE " else mempty)
+    <> "INDEX "
+    <> (if ifNotExists then "IF NOT EXISTS " else mempty)
+    <> pretty name
+    <> " ON "
+    <> pretty table
+    <> space
+    <> parenthesized (list1 prettyIndexedColumn columns)
+    <> maybe mempty (\e -> " WHERE " <> pretty e) where_
+
+-- https://sqlite.org/syntax/indexed-column.html
+prettyIndexedColumn :: IndexedColumn -> Doc a
+prettyIndexedColumn IndexedColumn {column, collation, ordering} =
+  pretty column
+    <> space
+    <> maybe mempty (\c -> "COLLATE " <> pretty c <> space) collation
+    <> case ordering of
+      Ascending -> "ASC"
+      Descending -> "DESC"
+
+-- https://sqlite.org/syntax/foreign-key-clause.html
+prettyForeignKeyClause :: ForeignKeyClause -> Doc a
+prettyForeignKeyClause = undefined
+
+-- https://sqlite.org/syntax/table-constraint.html
+prettyTableConstraint :: Named TableConstraint -> Doc a
+prettyTableConstraint Named {name, value} =
+  hsep
+    [ case name of
+        Nothing -> mempty
+        Just name1 -> "CONSTRAINT " <> pretty name1 <> space,
+      case value of
+        TableConstraint'Check expression -> "CHECK " <> parenthesized (pretty expression)
+        TableConstraint'ForeignKey columns clause ->
+          "FOREIGN KEY "
+            <> parenthesized (list1 pretty columns)
+            <> space
+            <> prettyForeignKeyClause clause
+        TableConstraint'PrimaryKey columns conflictResolution ->
+          "PRIMARY KEY " <> prettyIndexedColumns columns <> prettyConflictResolution conflictResolution
+        TableConstraint'Unique columns conflictResolution ->
+          "UNIQUE " <> prettyIndexedColumns columns <> prettyConflictResolution conflictResolution
+    ]
+  where
+    prettyIndexedColumns :: NonEmpty IndexedColumn -> Doc a
+    prettyIndexedColumns =
+      parenthesized . list1 prettyIndexedColumn
 
 instance Pretty CaseExpression where
   pretty CaseExpression {base, cases, else_} =
@@ -58,6 +141,11 @@ instance Pretty CastExpression where
   pretty CastExpression {expression, type_} =
     "CAST" <+> parenthesized (pretty expression <+> "AS" <+> pretty type_)
 
+-- https://sqlite.org/syntax/column-def.html
+instance Pretty ColumnDefinition where
+  pretty ColumnDefinition {name, type_, constraints} =
+    pretty name <> maybe mempty (\t -> space <> pretty t) type_ <> sep (map prettyColumnConstraint constraints)
+
 instance Pretty CommonTableExpressions where
   pretty = undefined
 
@@ -71,6 +159,29 @@ instance Pretty CompoundSelect where
     where
       compound s x y =
         hardlines [pretty x, s, pretty y]
+
+instance Pretty CreateTableStatement where
+  pretty CreateTableStatement {temporary, ifNotExists, name, definition} =
+    (group . mconcat)
+      [ "CREATE"
+          <> line
+          <> (if temporary then "TEMPORARY" <> line else mempty)
+          <> "TABLE"
+          <> line
+          <> (if ifNotExists then "IF NOT EXISTS" <> line else mempty)
+          <> pretty name
+          <> line
+          <> case definition of
+            Left selectStatement -> "AS" <> nest 2 (softline <> pretty selectStatement)
+            Right TableDefinition {columns, constraints, withoutRowid} ->
+              parenthesized
+                ( list
+                    ( map pretty (NonEmpty.toList columns)
+                        ++ map prettyTableConstraint constraints
+                    )
+                )
+                <> (if withoutRowid then line <> "WITHOUT ROWID" else mempty)
+      ]
 
 instance Pretty DeleteStatement where
   pretty DeleteStatement {commonTableExpressions, table, where_, returning} =
@@ -158,30 +269,33 @@ instance Pretty GroupBy where
   pretty GroupBy {groupBy, having} =
     group $
       "GROUP BY"
-        <> nest 2 (softline <> list1 (pretty <$> groupBy))
+        <> nest 2 (softline <> list1 pretty groupBy)
         <> maybe mempty (\e -> line <> "HAVING" <+> pretty e) having
 
 instance Pretty InsertStatement where
   pretty InsertStatement {commonTableExpressions, onConflict, table, columns, insert, returning} =
     case (commonTableExpressions, returning) of
       (Nothing, Nothing) ->
-        hardlines
-          [ mconcat
+        group
+          ( mconcat
               [ case onConflict of
                   Abort -> "INSERT"
                   Fail -> "INSERT OR FAIL"
                   Ignore -> "INSERT OR IGNORE"
                   Replace -> "REPLACE"
                   Rollback -> "INSERT OR ROLLBACK",
-                " INTO ",
+                line,
+                "INTO",
+                line,
                 prettyAsAlias table,
-                maybe mempty (\cs -> space <> parenthesized (list1 (pretty <$> cs))) columns
-              ],
-            case insert of
-              InsertDefaultValues -> "DEFAULT VALUES"
-              InsertSelect select Nothing -> pretty select
-              InsertSelect _ (Just _) -> undefined
-          ]
+                maybe mempty (\cs -> line <> parenthesized (list1 pretty cs)) columns,
+                line,
+                case insert of
+                  InsertDefaultValues -> "DEFAULT VALUES"
+                  InsertSelect select Nothing -> pretty select
+                  InsertSelect _ (Just _) -> undefined
+              ]
+          )
       _ -> undefined
 
 instance Pretty InValuesExpression where
@@ -199,7 +313,7 @@ instance Pretty Limit where
 
 instance Pretty LiteralValue where
   pretty = \case
-    Blob _ -> undefined
+    Blob x -> "x'" <> pretty x <> "'"
     Boolean True -> "TRUE"
     Boolean False -> "FALSE"
     CurrentDate -> "CURRENT_DATE"
@@ -248,7 +362,7 @@ instance Pretty Select where
     hardlines
       ( ( "SELECT"
             <> (if distinct then space <> "DISTINCT" else mempty)
-            <> nest 2 (softline <> list1 (pretty <$> columns))
+            <> nest 2 (softline <> list1 pretty columns)
         ) :
         catMaybes
           [ (("FROM" <+>) . pretty) <$> from,
@@ -262,8 +376,7 @@ instance Pretty Select where
       prettyWindow =
         nest 2
           . (softline <>)
-          . list1
-          . fmap (\(Aliased x (Identity y)) -> hsep [pretty y, "AS", pretty x])
+          . list1 (\(Aliased x (Identity y)) -> hsep [pretty y, "AS", pretty x])
 
 instance Pretty SelectCore where
   pretty = \case
@@ -277,39 +390,40 @@ instance Pretty SelectStatement where
         sep
           ( pretty select :
             catMaybes
-              [ (("ORDER BY" <>) . nest 2 . (softline <>) . list1 . fmap pretty) <$> orderBy,
+              [ (("ORDER BY" <>) . nest 2 . (softline <>) . list1 pretty) <$> orderBy,
                 pretty <$> limit
               ]
           )
       Just _ -> undefined
 
 instance Pretty Statement where
-  pretty = \case
-    Statement'Select x -> pretty x
-    Statement'AlterTable {} -> undefined
-    Statement'Analyze {} -> undefined
-    Statement'Attach {} -> undefined
-    Statement'Begin x -> hsep ["BEGIN", pretty x, "TRANSACTION"]
-    Statement'Commit {} -> undefined
-    Statement'CreateIndex {} -> undefined
-    Statement'CreateTable {} -> undefined
-    Statement'CreateTrigger {} -> undefined
-    Statement'CreateView {} -> undefined
-    Statement'CreateVirtualTable {} -> undefined
-    Statement'Delete x -> pretty x
-    Statement'Detach {} -> undefined
-    Statement'DropIndex {} -> undefined
-    Statement'DropTable {} -> undefined
-    Statement'DropTrigger {} -> undefined
-    Statement'DropView {} -> undefined
-    Statement'Insert x -> pretty x
-    Statement'Pragma {} -> undefined
-    Statement'Reindex {} -> undefined
-    Statement'Release {} -> undefined
-    Statement'Rollback {} -> undefined
-    Statement'Savepoint {} -> undefined
-    Statement'Update {} -> undefined
-    Statement'Vacuum {} -> undefined
+  pretty =
+    (<> Prettyprinter.Char ';') . \case
+      Statement'Select x -> pretty x
+      Statement'AlterTable {} -> undefined
+      Statement'Analyze {} -> undefined
+      Statement'Attach {} -> undefined
+      Statement'Begin x -> hsep ["BEGIN", pretty x, "TRANSACTION"]
+      Statement'Commit {} -> undefined
+      Statement'CreateIndex statement -> prettyCreateIndexStatement statement
+      Statement'CreateTable x -> pretty x
+      Statement'CreateTrigger {} -> undefined
+      Statement'CreateView {} -> undefined
+      Statement'CreateVirtualTable {} -> undefined
+      Statement'Delete x -> pretty x
+      Statement'Detach {} -> undefined
+      Statement'DropIndex {} -> undefined
+      Statement'DropTable {} -> undefined
+      Statement'DropTrigger {} -> undefined
+      Statement'DropView {} -> undefined
+      Statement'Insert x -> pretty x
+      Statement'Pragma {} -> undefined
+      Statement'Reindex {} -> undefined
+      Statement'Release {} -> undefined
+      Statement'Rollback {} -> undefined
+      Statement'Savepoint {} -> undefined
+      Statement'Update {} -> undefined
+      Statement'Vacuum {} -> undefined
 
 instance Pretty Table where
   pretty = \case
@@ -354,7 +468,7 @@ instance Pretty TransactionType where
 
 instance Pretty Values where
   pretty (Values xs) =
-    "VALUES" <> nest 2 (softline <> list1 (parenthesized . list1 . fmap pretty <$> xs))
+    "VALUES" <> nest 2 (softline <> list1 id (parenthesized . list1 pretty <$> xs))
 
 instance Pretty Window where
   pretty = undefined

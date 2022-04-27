@@ -15,17 +15,16 @@ import qualified Data.Text.Lazy.Builder as Text.Builder
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-import Sqlite.Syntax.Lexer (lex)
+import Sqlite.Syntax.Lexer (lex, renderLexerError)
 import Sqlite.Syntax.Token (LocatedToken (..), Token (..))
 import qualified Sqlite.Syntax.Token as Token (render)
-import qualified Text.Megaparsec as Megaparsec
 import Prelude hiding (lex)
 
 propRoundTrip :: PropertyT IO ()
 propRoundTrip = do
   tokens0 <- forAll (Gen.list (Range.linear 1 10) genToken)
   case lex (buildText (renderTokens tokens0)) of
-    Left errorBundle -> fail (Megaparsec.errorBundlePretty errorBundle)
+    Left lexerError -> fail (Text.unpack (renderLexerError lexerError))
     Right tokens1 -> tokens0 === map (\(LocatedToken tok _) -> tok) tokens1
 
 unitTests :: PropertyT IO ()

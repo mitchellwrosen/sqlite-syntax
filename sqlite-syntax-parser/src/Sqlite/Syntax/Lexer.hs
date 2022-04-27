@@ -1,28 +1,43 @@
 -- Here's something: https://www.sqlite.org/draft/tokenreq.html
 module Sqlite.Syntax.Lexer
   ( lex,
+    LexerError (..),
+    renderLexerError,
   )
 where
 
 import Control.Applicative (many, (<|>))
 import Control.Monad.Combinators (choice, manyTill, optional)
 import Data.Char (isAlpha, isAlphaNum, isDigit, isHexDigit, isSpace)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Read as Text.Read
-import Data.Void (Void)
+import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
+import Sqlite.Syntax.Internal.Error (renderError)
 import Sqlite.Syntax.Token (LocatedToken (..), Token (..))
 import qualified Text.Megaparsec as Megaparsec
 import TextParser (TextParser)
 import qualified TextParser
 import Prelude hiding (exponent, lex)
 
-lex :: Text -> Either (Megaparsec.ParseErrorBundle Text Void) [LocatedToken]
-lex =
-  TextParser.run do
-    space
-    manyTill locatedTokenP TextParser.eof
+lex :: Text -> Either LexerError [LocatedToken]
+lex input =
+  case TextParser.run (space >> manyTill locatedTokenP TextParser.eof) input of
+    Left errorBundle ->
+      Left (LexerError input (Megaparsec.errorOffset (NonEmpty.head (Megaparsec.bundleErrors errorBundle))))
+    Right tokens -> Right tokens
+
+data LexerError = LexerError
+  { input :: Text,
+    offset :: Int
+  }
+  deriving stock (Eq, Generic, Show)
+
+renderLexerError :: LexerError -> Text
+renderLexerError LexerError {input, offset} =
+  renderError "Lexer error" input (Just offset)
 
 --
 

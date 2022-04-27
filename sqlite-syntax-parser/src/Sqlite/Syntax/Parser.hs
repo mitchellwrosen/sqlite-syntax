@@ -7,7 +7,6 @@ import Control.Applicative.Combinators (choice)
 import Control.Applicative.Combinators.NonEmpty (some)
 import Data.Functor.Identity (Identity (..))
 import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -34,7 +33,7 @@ import Sqlite.Syntax.Internal.Parser.Rule.SelectStatement (makeSelectStatementRu
 import Sqlite.Syntax.Internal.Parser.Rule.Table (makeTableRule)
 import Sqlite.Syntax.Internal.Parser.Rule.Values (makeValuesRule)
 import Sqlite.Syntax.Internal.Parser.Utils
-import Sqlite.Syntax.Lexer (lex)
+import qualified Sqlite.Syntax.Lexer as Lexer
 import qualified Sqlite.Syntax.Parser.Token as Token
 import Sqlite.Syntax.Token (LocatedToken (..))
 import qualified Text.Earley as Earley
@@ -53,22 +52,21 @@ import Prelude hiding (Ordering, fail, lex, not, null)
 --
 
 -- TODO this is temporary
-data ParseError
-  = SyntaxError Text Int
-  | ParseError Text (Maybe Int) (Set Text)
+data ParserError
+  = LexerError Lexer.LexerError
+  | ParserError Text (Maybe Int) (Set Text)
   | -- Temporary
     forall a. Show a => AmbiguousParse a
 
-parse :: Show a => Earley.Parser Text [LocatedToken] a -> Text -> Either ParseError a
+parse :: Show a => Earley.Parser Text [LocatedToken] a -> Text -> Either ParserError a
 parse parser sql =
-  case lex sql of
-    Left errorBundle ->
-      Left (SyntaxError sql (Megaparsec.errorOffset (NonEmpty.head (Megaparsec.bundleErrors errorBundle))))
+  case Lexer.lex sql of
+    Left lexerError -> Left (LexerError lexerError)
     Right tokens ->
       case Earley.fullParses parser tokens of
         ([], Earley.Report {expected, unconsumed}) ->
           Left
-            ( ParseError
+            ( ParserError
                 sql
                 ( case unconsumed of
                     [] -> Nothing
@@ -83,14 +81,14 @@ debugParseFile :: FilePath -> IO ()
 debugParseFile path = do
   sql <- Text.readFile ("test/files/" ++ path)
   case parseStatement sql of
-    Left err -> Text.putStrLn (renderParseError err)
+    Left err -> Text.putStrLn (renderParserError err)
     Right statement -> print statement
 
-renderParseError :: ParseError -> Text
-renderParseError = \case
-  SyntaxError input offset -> renderError "Syntax error" input (Just offset)
-  ParseError input maybeOffset expected ->
-    renderError ("Expected " <> Text.intercalate ", " (Set.toList expected)) input maybeOffset
+renderParserError :: ParserError -> Text
+renderParserError = \case
+  LexerError lexerError -> Lexer.renderLexerError lexerError
+  ParserError input maybeOffset expected ->
+    renderError ("Expected one of: " <> Text.intercalate ", " (Set.toList expected)) input maybeOffset
   AmbiguousParse ss -> Text.pack (show ss)
   where
     renderError :: Text -> Text -> Maybe Int -> Text
@@ -126,13 +124,17 @@ renderParseError = \case
                   pstateLinePrefix = ""
                 }
 
-parseExpression :: Text -> Either ParseError Expression
+parseExpression :: Text -> Either ParserError Expression
 parseExpression =
-  parse (Earley.parser (synExpression <$> syntaxParser))
+  parse (Earley.parser expressionParser)
 
-parseStatement :: Text -> Either ParseError Statement
+parseStatement :: Text -> Either ParserError Statement
 parseStatement =
-  parse (Earley.parser (synStatement <$> syntaxParser))
+  parse (Earley.parser statementParser)
+
+parseStatements :: Text -> Either ParserError (NonEmpty Statement)
+parseStatements =
+  parse (Earley.parser (some <$> statementParser))
 
 --
 
@@ -317,6 +319,14 @@ syntaxParser = mdo
                   ExcludeTies <$ (Token.exclude *> Token.ties),
                   pure ExcludeNoOthers
                 ]
+
+expressionParser :: Earley.Grammar r (Rule r Expression)
+expressionParser =
+  synExpression <$> syntaxParser
+
+statementParser :: Earley.Grammar r (Rule r Statement)
+statementParser =
+  synStatement <$> syntaxParser
 
 --
 

@@ -24,14 +24,14 @@ parseGoldenFiles = do
       sql <- readFile ("test/files/in/" ++ file)
       Text.putStrLn sql
       Text.putStrLn "\n==>\n"
-      case Parser.parseStatement sql of
+      case Parser.parseStatements sql of
         Left err -> do
           case err of
-            Parser.SyntaxError {} -> Text.putStrLn (Parser.renderParseError err)
-            Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
+            Parser.LexerError {} -> Text.putStrLn (Parser.renderParserError err)
+            Parser.ParserError {} -> Text.putStrLn (Parser.renderParserError err)
             Parser.AmbiguousParse x -> pPrint x
-        Right statement -> do
-          print (pretty statement)
+        Right statements -> do
+          for_ statements (print . pretty)
           -- putStrLn ""
           -- pPrint statement
           _ <- getLine

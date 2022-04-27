@@ -50,8 +50,8 @@ main = do
                           case Parser.parseStatement sql of
                             Left err -> do
                               case err of
-                                Parser.SyntaxError {} -> Text.putStrLn (Parser.renderParseError err)
-                                Parser.ParseError {} -> Text.putStrLn (Parser.renderParseError err)
+                                Parser.LexerError {} -> Text.putStrLn (Parser.renderParserError err)
+                                Parser.ParserError {} -> Text.putStrLn (Parser.renderParserError err)
                                 Parser.AmbiguousParse x -> pPrint x
                               exitFailure
                             Right statement -> pure (Text.Lazy.toStrict (pShowNoColor statement))

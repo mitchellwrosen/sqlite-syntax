@@ -27,6 +27,7 @@ data CreateTableStatement = CreateTableStatement
   }
   deriving stock (Eq, Generic, Show)
 
+-- | https://sqlite.org/syntax/table-constraint.html
 data TableConstraint
   = TableConstraint'Check Expression
   | TableConstraint'ForeignKey (NonEmpty Text) ForeignKeyClause
@@ -34,9 +35,12 @@ data TableConstraint
   | TableConstraint'Unique (NonEmpty IndexedColumn) ConflictResolution
   deriving stock (Eq, Generic, Show)
 
+-- | https://sqlite.org/syntax/create-table-stmt.html
 data TableDefinition = TableDefinition
   { columns :: NonEmpty ColumnDefinition,
     constraints :: [Named TableConstraint],
+    -- FIXME this is now table-options
+    -- https://sqlite.org/syntax/table-options.html
     withoutRowid :: Bool
   }
   deriving stock (Eq, Generic, Show)

@@ -6,7 +6,7 @@ version: 0
 
 common component
   build-depends:
-    base ^>= 4.15,
+    base ^>= 4.15 || ^>= 4.16,
     bytestring,
     containers,
     Earley,
@@ -61,6 +61,7 @@ library
     sqlite-syntax-parser/src
     sqlite-syntax-pretty/src
   other-modules:
+    Sqlite.Syntax.Internal.Error
     Sqlite.Syntax.Internal.Parser.Rule.Aliased
     Sqlite.Syntax.Internal.Parser.Rule.CommonTableExpression
     Sqlite.Syntax.Internal.Parser.Rule.CompoundSelect
